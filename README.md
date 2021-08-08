@@ -14,7 +14,7 @@ This should be a program that helps with quick annotations in screenshots made w
 
 ## Video
 
-![](https://cdn.discordapp.com/attachments/833686255446917123/874009115263901746/huhuhu.mp4)
+![](https://cdn.discordapp.com/attachments/833686255446917123/874025047524798525/output.gif)
 
 ## TODO
 - [ ] make the second command line argument do its job
