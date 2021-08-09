@@ -20,7 +20,6 @@
             <property name="visible">True</property>
             <property name="can-focus">True</property>
             <property name="receives-default">True</property>
-            <property name="use-alpha">True</property>
             <property name="color">#000000000000</property>
             <property name="show-editor">True</property>
           </object>

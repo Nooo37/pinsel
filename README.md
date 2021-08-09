@@ -22,7 +22,7 @@ This should be a program that helps with quick annotations in screenshots made w
 - [x] fix image dragging by holding the middle mouse button
 - [ ] make the popup better looking
 - [x] add clipboard support
-- [ ] interpolate between two drawn dots to create a more smooth line
+- [x] interpolate between two drawn dots to create a more smooth line
 - [ ] eraser
 - [ ] text tool
 

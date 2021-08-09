@@ -4,15 +4,26 @@
 static int DELTA_MOVE = 20;
 static float DELTA_ZOOM = 0.04;
 
+typedef struct
+{
+    int x;
+    int y;
+} coord_t;
+
 // global state. I hope that is how one does C
 char dest[] = "";
 
-// Gtk Elements
+// Gtk
+GdkDisplay *display;
+GdkSeat* seat;
+GdkDevice *device;
+
 GtkWidget *canvas;
 
 // pixbufs
 GdkPixbuf *pix;
 GdkPixbuf *old;
+GdkPixbuf *before_action;
 int img_width = 0;
 int img_height = 0;
 
@@ -24,8 +35,10 @@ int offset_x = 0;
 int offset_y = 0;
 
 // brush settings
+bool is_stroking = false;
 GdkRGBA color;
 int radius = 10;
+GList* coords = NULL;
 
 // mouse dragging
 bool is_dragging = false;
@@ -34,25 +47,38 @@ int dragstart_y = 0;
 int offset_old_x = 0;
 int offset_old_y = 0;
 
-// adds a dot at position (x, y) using global brush settings
-static void add_dot(int x, int y) 
+
+// draws all coordinates stored in coords to to_be_drawn_on
+// and returns the resulting new pixbuf
+static GdkPixbuf* draw_line(GdkPixbuf* to_be_drawn_on)
 {
     cairo_surface_t *surface;
     cairo_t *cr;
+    coord_t* value;
+    GList* listrunner;
+
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 
                     img_width, img_height);
     cr = cairo_create(surface);
 
-    cairo_move_to(cr, 0, 0);
-    gdk_cairo_set_source_pixbuf(cr, pix, 0, 0);
+    gdk_cairo_set_source_pixbuf(cr, to_be_drawn_on, 0, 0);
     cairo_paint(cr);
     cairo_set_source_rgba(cr, color.red, color.green, color.blue, color.alpha);
-    cairo_arc(cr, x, y, radius, 0, 2 * G_PI);
-    cairo_fill(cr);
-    surface = cairo_get_target(cr);
-    pix = gdk_pixbuf_get_from_surface(surface, 0, 0, 
-                    cairo_image_surface_get_width(surface), 
-                    cairo_image_surface_get_height(surface));
+    cairo_set_line_width(cr, radius * 2);
+    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+
+    listrunner = g_list_first(coords);
+    value = listrunner->data;
+    cairo_move_to(cr, value->x, value->y);
+
+    while (listrunner != NULL) {
+        value = listrunner->data;
+        cairo_line_to(cr, value->x, value->y);
+        listrunner = g_list_next(listrunner);
+    }
+
+    cairo_stroke(cr);
+    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 }
 
 // updates the drawing area based on global state
@@ -186,8 +212,7 @@ static gint motion_notify_event( GtkWidget *widget,
 
     // get coords
     if (event->is_hint) {
-        gdk_window_get_pointer (event->window, &x, &y, &state);
-
+        gdk_window_get_device_position (event->window, device, &x, &y, &state);
     } else {
         x = event->x;
         y = event->y;
@@ -198,11 +223,28 @@ static gint motion_notify_event( GtkWidget *widget,
     if (state & GDK_BUTTON1_MASK) {
         x_translated = (x - offset_x - mid_x) / scale;
         y_translated = (y - offset_y - mid_y) / scale;
-        // TODO: interpolate between current point and previous one to get a 
-        // straight line even with few signal triggerings
-        add_dot(x_translated, y_translated);
-        update_drawing_area();
+        if (is_stroking) {
+            coord_t* temp = g_new(coord_t, 1);
+            temp->x = x_translated;
+            temp->y = y_translated;
+            coords = g_list_append(coords, temp);
+            pix = draw_line(before_action);
+            update_drawing_area();
+        } else {
+            is_stroking = true;
+            before_action = pix;
+            update_drawing_area();
+        }
+    } else {
+        if (is_stroking) {
+            pix = draw_line(before_action);
+            g_list_free(coords);
+            coords = NULL;
+            update_drawing_area();
+        }
+        is_stroking = false;
     }
+
     // image dragging
     if (state & GDK_BUTTON2_MASK) {
         if (is_dragging) {
@@ -220,7 +262,7 @@ static gint motion_notify_event( GtkWidget *widget,
         is_dragging = false;
     }
 
-  return TRUE;
+    return TRUE;
 }
 
 // undo all changes
@@ -288,7 +330,7 @@ gboolean my_key_press(GtkWidget *widget,
         gtk_main_quit();
     }
     if (event->keyval == 'c') {
-        GdkDisplay *display = gdk_display_get_default();
+        // TODO: still doesn't _quite_ work?
         GtkClipboard *clipboard = gtk_clipboard_get_for_display(display,
                         GDK_SELECTION_CLIPBOARD);
         gtk_clipboard_set_image(clipboard, pix);
@@ -305,8 +347,10 @@ int main(int argc, char *argv[])
     GtkBuilder *builder; 
     GtkWidget *window;
     GtkButton *undo_button;
-    GtkColorButton *color_picker;
-    GtkScale *radius_scale;
+    GtkColorChooser *color_picker;
+    GtkRange *radius_scale;
+
+    // init device
 
     // init image related
 
@@ -320,10 +364,16 @@ int main(int argc, char *argv[])
     img_width = gdk_pixbuf_get_width(pix);
     img_height = gdk_pixbuf_get_height(pix);
 
-    // EPIC WIDGETS
+    // gtk stuff
 
     gtk_init(&argc, &argv);
 
+    // getting devices for mouse position, clipboard
+    display = gdk_display_get_default();
+    seat = gdk_display_get_default_seat(display);
+    device = gdk_seat_get_pointer(seat);
+
+    // building and getting all the widgets, connecting signals
     builder = gtk_builder_new();
     gtk_builder_add_from_file (builder, "window.glade", NULL);
 
@@ -357,7 +407,7 @@ int main(int argc, char *argv[])
                     G_CALLBACK(undo_all_changes), NULL);
 
     // color picker
-    color_picker = GTK_COLOR_BUTTON(gtk_builder_get_object(builder, "color_picker"));
+    color_picker = GTK_COLOR_CHOOSER(gtk_builder_get_object(builder, "color_picker"));
     g_signal_connect(G_OBJECT(color_picker), "color-set", 
                     G_CALLBACK(change_color), NULL);
 
@@ -365,7 +415,7 @@ int main(int argc, char *argv[])
     gtk_color_chooser_set_rgba(color_picker, &color);
 
     // slider
-    radius_scale = GTK_WIDGET(gtk_builder_get_object(builder, "radius_scale"));
+    radius_scale = GTK_RANGE(gtk_builder_get_object(builder, "radius_scale"));
     g_signal_connect(G_OBJECT(radius_scale), "value-changed", 
                     G_CALLBACK(change_radius), NULL);
     gtk_range_set_value(radius_scale, radius);
@@ -373,6 +423,7 @@ int main(int argc, char *argv[])
     // start
     gtk_widget_show(window);                
     scale = get_sane_scale();
+
     gtk_main();
 
     return 0;
