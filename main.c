@@ -184,6 +184,7 @@ static gint motion_notify_event( GtkWidget *widget,
     int x, y, x_translated, y_translated;
     GdkModifierType state;
 
+    // get coords
     if (event->is_hint) {
         gdk_window_get_pointer (event->window, &x, &y, &state);
 
@@ -193,6 +194,7 @@ static gint motion_notify_event( GtkWidget *widget,
         state = event->state;
     }
       
+    // strokes
     if (state & GDK_BUTTON1_MASK) {
         x_translated = (x - offset_x - mid_x) / scale;
         y_translated = (y - offset_y - mid_y) / scale;
@@ -201,21 +203,21 @@ static gint motion_notify_event( GtkWidget *widget,
         add_dot(x_translated, y_translated);
         update_drawing_area();
     }
+    // image dragging
     if (state & GDK_BUTTON2_MASK) {
-        // TODO: fix, doesn't work rn. What I did here is just coping with 
-        // my inability to detect mouse button releases 
-        if (is_dragging == true) {
-            offset_x -= dragstart_x - x;
-            offset_y -= dragstart_y - y;
-            dragstart_x = x;
-            dragstart_y = y;
-            is_dragging = false;
+        if (is_dragging) {
+            offset_x = offset_old_x - (dragstart_x - x);
+            offset_y = offset_old_y - (dragstart_y - y);
             update_drawing_area();
         } else {
             is_dragging = true;
+            offset_old_x = offset_x;
+            offset_old_y = offset_y;
             dragstart_x = x;
             dragstart_y = y;
         }
+    } else {
+        is_dragging = false;
     }
 
   return TRUE;

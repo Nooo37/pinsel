@@ -18,7 +18,7 @@ This should be a program that helps with quick annotations in screenshots made w
 
 ## TODO
 - [ ] make the second command line argument do its job
-- [ ] fix image dragging by holding the middle mouse button
+- [x] fix image dragging by holding the middle mouse button
 - [ ] make the popup better looking
 - [ ] add clipboard support
 - [ ] interpolate between two drawn dots to create a more smooth line
