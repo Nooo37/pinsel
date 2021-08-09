@@ -284,14 +284,16 @@ gboolean my_key_press(GtkWidget *widget,
         undo_all_changes();
     if (event->keyval == 'q') {
         // TODO: the save destination shoule have been the second argument
-        gtk_main_quit();
         gdk_pixbuf_save(pix, "file.png", "png", NULL, NULL);
+        gtk_main_quit();
     }
     if (event->keyval == 'c') {
-        // TODO: doesn't work yet, figuring out clipboards
-        GtkClipboard* clipboard = gtk_clipboard_get(GDK_SELECTION_PRIMARY);
+        GdkDisplay *display = gdk_display_get_default();
+        GtkClipboard *clipboard = gtk_clipboard_get_for_display(display,
+                        GDK_SELECTION_CLIPBOARD);
         gtk_clipboard_set_image(clipboard, pix);
-        gtk_main_quit();
+        // the application has to remain open long enough to
+        // copy the image, closing it right after here won't work
     }
     return FALSE;
 }
