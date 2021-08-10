@@ -11,11 +11,11 @@ typedef struct
 } coord_t;
 
 // global state. I hope that is how one does C
-char dest[] = "";
+char *dest = "file.png";
 
 // Gtk
 GdkDisplay *display;
-GdkSeat* seat;
+GdkSeat *seat;
 GdkDevice *device;
 
 GtkWidget *canvas;
@@ -36,9 +36,10 @@ int offset_y = 0;
 
 // brush settings
 bool is_stroking = false;
-GdkRGBA color;
+GdkRGBA color1; // primary color
+GdkRGBA color2; // secondary color
 int radius = 10;
-GList* coords = NULL;
+GList *coords = NULL;
 
 // mouse dragging
 bool is_dragging = false;
@@ -54,8 +55,8 @@ static GdkPixbuf* draw_line(GdkPixbuf* to_be_drawn_on)
 {
     cairo_surface_t *surface;
     cairo_t *cr;
-    coord_t* value;
-    GList* listrunner;
+    coord_t *value;
+    GList *listrunner;
 
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 
                     img_width, img_height);
@@ -63,14 +64,21 @@ static GdkPixbuf* draw_line(GdkPixbuf* to_be_drawn_on)
 
     gdk_cairo_set_source_pixbuf(cr, to_be_drawn_on, 0, 0);
     cairo_paint(cr);
-    cairo_set_source_rgba(cr, color.red, color.green, color.blue, color.alpha);
+    cairo_set_source_rgba(cr, color1.red, color1.green, color1.blue, color1.alpha);
     cairo_set_line_width(cr, radius * 2);
     cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
+    cairo_set_line_join (cr, CAIRO_LINE_JOIN_ROUND);
 
     listrunner = g_list_first(coords);
+    if (listrunner == NULL) {
+        return to_be_drawn_on;
+    }
+
+    // start at the first entry
     value = listrunner->data;
     cairo_move_to(cr, value->x, value->y);
 
+    // make lines from each entry to the next entry
     while (listrunner != NULL) {
         value = listrunner->data;
         cairo_line_to(cr, value->x, value->y);
@@ -78,6 +86,7 @@ static GdkPixbuf* draw_line(GdkPixbuf* to_be_drawn_on)
     }
 
     cairo_stroke(cr);
+
     return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 }
 
@@ -85,7 +94,7 @@ static GdkPixbuf* draw_line(GdkPixbuf* to_be_drawn_on)
 static gboolean update_drawing_area() 
 {
     /* cairo_t *cr; */
-    GtkAllocation* alloc = g_new(GtkAllocation, 1);
+    GtkAllocation *alloc = g_new(GtkAllocation, 1);
     gtk_widget_get_allocation(canvas, alloc);
     int area_width = alloc->width;
     int area_height = alloc->height;
@@ -187,20 +196,19 @@ static gint button_press_event( GtkWidget      *widget,
 
 // connect to that to get scale on mouse scrolling
 static gboolean mouse_scroll( GtkWidget *widget,
-                              GdkEvent *event,
+                              GdkEventScroll *event,
                               gpointer data) 
 {
-    double delta_x, delta_y;
-    if (gdk_event_get_scroll_deltas(event, &delta_x, &delta_y)) {
-        if (delta_y < 0) {
-            decrease_scale();
-        }
-        if (delta_y > 0) {
+    /* if (event->state == GDK_CONTROL_MASK) { */
+        if (event->direction == GDK_SCROLL_UP) {
             increase_scale();
         }
+        if (event->direction == GDK_SCROLL_DOWN) {
+            decrease_scale();
+        }
         return TRUE;
-    }
-    return FALSE;
+    /* } */
+    /* return FALSE; */
 }
 
 // connect to that to get painting (and future dragging) abilities
@@ -274,10 +282,39 @@ static void undo_all_changes()
     update_drawing_area();
 }
 
-// connect to that to get the color button to do its job
-static void change_color(GtkColorButton *color_button)
+// switch primary and secondary color
+static void switch_colors()
 {
-    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color);
+    GdkRGBA temp;
+    temp = color1;
+    color1 = color2;
+    color2 = temp;
+}
+
+// update the primary colors button
+static void update_color_primary(GtkButton *button, gpointer user_data)
+{
+    GtkColorChooser *chooser = (GtkColorChooser*) user_data;
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), &color1);
+}
+
+// update the secondary colors button
+static void update_color_secondary(GtkButton *button, gpointer user_data)
+{
+    GtkColorChooser *chooser = (GtkColorChooser*) user_data;
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), &color2);
+}
+
+// connect to that to get the color button to do its job
+static void change_color1(GtkColorButton *color_button)
+{
+    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color1);
+}
+
+// connect to that to get the color button to do its job
+static void change_color2(GtkColorButton *color_button)
+{
+    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color2);
 }
 
 // connect to that to get the slider to do its job
@@ -289,18 +326,8 @@ static void change_radius(GtkRange *range)
 // get sane scaling default based on the image size at app launch
 float get_sane_scale() 
 {
-    GtkAllocation* alloc = g_new(GtkAllocation, 1);
-    gtk_widget_get_allocation(canvas, alloc);
-    int area_width = alloc->width;
-    int area_height = alloc->height;
-    g_free(alloc);
-    if ((area_width / area_height) > (img_width / img_height)) {
-        // the area has a wider aspect ratio than the image
-        return (area_height / img_height) ;
-    } else {
-        // the image has a wider aspect raio than the area
-        return (area_width / img_width) ;
-    }
+    return 1;
+    // TODO: fix
 }
 
 // global keybinds
@@ -308,7 +335,7 @@ gboolean my_key_press(GtkWidget *widget,
                       GdkEventKey *event,
                       gpointer user_data) 
 {
-    if (event->state & GDK_CONTROL_MASK && event->keyval == 'w')
+    if (event->state == GDK_CONTROL_MASK && event->keyval == 'w')
         gtk_main_quit();
     if (event->keyval == 'u')
         increase_scale();
@@ -326,7 +353,7 @@ gboolean my_key_press(GtkWidget *widget,
         undo_all_changes();
     if (event->keyval == 'q') {
         // TODO: the save destination shoule have been the second argument
-        gdk_pixbuf_save(pix, "file.png", "png", NULL, NULL);
+        gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
         gtk_main_quit();
     }
     if (event->keyval == 'c') {
@@ -347,13 +374,14 @@ int main(int argc, char *argv[])
     GtkBuilder *builder; 
     GtkWidget *window;
     GtkButton *undo_button;
-    GtkColorChooser *color_picker;
+    GtkButton *color_switch_button;
+    GtkColorChooser *color_picker_primary;
+    GtkColorChooser *color_picker_secondary;
     GtkRange *radius_scale;
-
-    // init device
 
     // init image related
 
+    dest = argv[2];
     pix = gdk_pixbuf_new_from_file(argv[1], &err);
     if(err) {
         printf("Error : %s\n", err->message);
@@ -368,7 +396,7 @@ int main(int argc, char *argv[])
 
     gtk_init(&argc, &argv);
 
-    // getting devices for mouse position, clipboard
+    // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
     seat = gdk_display_get_default_seat(display);
     device = gdk_seat_get_pointer(seat);
@@ -377,22 +405,26 @@ int main(int argc, char *argv[])
     builder = gtk_builder_new();
     gtk_builder_add_from_file (builder, "window.glade", NULL);
 
+    // main window and its callbacks
     window = GTK_WIDGET(gtk_builder_get_object(builder, "window1"));
     gtk_builder_connect_signals(builder, NULL);
     g_signal_connect(G_OBJECT(window), "destroy", 
                     G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(G_OBJECT(window), "key-press-event", 
                     G_CALLBACK(my_key_press), NULL);
-    gtk_widget_add_events(window, GDK_KEY_PRESS_MASK|GDK_KEY_RELEASE_MASK);
 
+    gtk_widget_add_events(window, GDK_KEY_PRESS_MASK
+                    | GDK_KEY_RELEASE_MASK);
+
+    // drawing area and its callbacks
     canvas = GTK_WIDGET(gtk_builder_get_object(builder, "drawing_area"));
-    g_signal_connect(G_OBJECT(canvas), "draw", G_CALLBACK(on_draw), NULL);
-
+    g_signal_connect(G_OBJECT(canvas), "draw", 
+                    G_CALLBACK(on_draw), NULL);
     g_signal_connect (G_OBJECT(canvas), "motion_notify_event", 
                     G_CALLBACK(motion_notify_event), NULL);
     g_signal_connect (G_OBJECT(canvas), "button_press_event", 
                     G_CALLBACK(button_press_event), NULL);
-    g_signal_connect(G_OBJECT(window), "scroll-event", 
+    g_signal_connect (G_OBJECT(canvas), "scroll-event", 
                     G_CALLBACK(mouse_scroll), NULL);
 
     gtk_widget_set_events (canvas, GDK_EXPOSURE_MASK
@@ -407,12 +439,22 @@ int main(int argc, char *argv[])
                     G_CALLBACK(undo_all_changes), NULL);
 
     // color picker
-    color_picker = GTK_COLOR_CHOOSER(gtk_builder_get_object(builder, "color_picker"));
-    g_signal_connect(G_OBJECT(color_picker), "color-set", 
-                    G_CALLBACK(change_color), NULL);
+    color_picker_primary = GTK_COLOR_CHOOSER(gtk_builder_get_object(builder, "color_picker_primary"));
+    g_signal_connect(G_OBJECT(color_picker_primary), "color-set", 
+                    G_CALLBACK(change_color1), NULL);
+    color_picker_secondary = GTK_COLOR_CHOOSER(gtk_builder_get_object(builder, "color_picker_secondary"));
+    g_signal_connect(G_OBJECT(color_picker_secondary), "color-set", 
+                    G_CALLBACK(change_color2), NULL);
+    color_switch_button = GTK_BUTTON(gtk_builder_get_object(builder, "color_switch"));
+    g_signal_connect(G_OBJECT(color_switch_button), "pressed", 
+                    G_CALLBACK(switch_colors), NULL);
+    g_signal_connect(G_OBJECT(color_switch_button), "pressed", 
+                    G_CALLBACK(update_color_primary), (gpointer) color_picker_primary);
+    g_signal_connect(G_OBJECT(color_switch_button), "pressed", 
+                    G_CALLBACK(update_color_secondary), (gpointer) color_picker_secondary);
 
-    color.alpha = 1; // rest is already at 0 for black
-    gtk_color_chooser_set_rgba(color_picker, &color);
+    gtk_color_chooser_get_rgba(color_picker_primary, &color1);
+    gtk_color_chooser_get_rgba(color_picker_secondary, &color2);
 
     // slider
     radius_scale = GTK_RANGE(gtk_builder_get_object(builder, "radius_scale"));

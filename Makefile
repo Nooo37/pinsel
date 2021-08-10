@@ -1,3 +1,7 @@
-# idk makefiles (yet) 🤷
-default: main.c
-	gcc -o nanoanno main.c -Wall `pkg-config --cflags --libs gtk+-3.0` -export-dynamic
+# still no real idea
+CC = gcc
+LDLIBS = $(shell pkg-config --cflags --libs gtk+-3.0)
+
+nanoanno: main.c
+	$(CC) main.c -o nanoanno -Wall $(LDLIBS) -export-dynamic
+

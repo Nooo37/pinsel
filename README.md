@@ -18,7 +18,7 @@ This should be a program that helps with quick annotations in screenshots made w
 ![](https://cdn.discordapp.com/attachments/833686255446917123/874025047524798525/output.gif)
 
 ## TODO
-- [ ] make the second command line argument do its job
+- [x] make the second command line argument do its job
 - [x] fix image dragging by holding the middle mouse button
 - [ ] make the popup better looking
 - [x] add clipboard support
