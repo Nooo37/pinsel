@@ -1,14 +1,11 @@
 #include <stdbool.h>
 #include <gtk/gtk.h>
+#include <string.h>
 
-static int DELTA_MOVE = 20;
-static float DELTA_ZOOM = 0.04;
+#include "draw.h"
 
-typedef struct
-{
-    int x;
-    int y;
-} coord_t;
+const int DELTA_MOVE = 20;
+const float DELTA_ZOOM = 0.04;
 
 // global state. I hope that is how one does C
 char *dest = "file.png";
@@ -49,47 +46,6 @@ int offset_old_x = 0;
 int offset_old_y = 0;
 
 
-// draws all coordinates stored in coords to to_be_drawn_on
-// and returns the resulting new pixbuf
-static GdkPixbuf* draw_line(GdkPixbuf* to_be_drawn_on)
-{
-    cairo_surface_t *surface;
-    cairo_t *cr;
-    coord_t *value;
-    GList *listrunner;
-
-    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 
-                    img_width, img_height);
-    cr = cairo_create(surface);
-
-    gdk_cairo_set_source_pixbuf(cr, to_be_drawn_on, 0, 0);
-    cairo_paint(cr);
-    cairo_set_source_rgba(cr, color1.red, color1.green, color1.blue, color1.alpha);
-    cairo_set_line_width(cr, radius * 2);
-    cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
-    cairo_set_line_join (cr, CAIRO_LINE_JOIN_ROUND);
-
-    listrunner = g_list_first(coords);
-    if (listrunner == NULL) {
-        return to_be_drawn_on;
-    }
-
-    // start at the first entry
-    value = listrunner->data;
-    cairo_move_to(cr, value->x, value->y);
-
-    // make lines from each entry to the next entry
-    while (listrunner != NULL) {
-        value = listrunner->data;
-        cairo_line_to(cr, value->x, value->y);
-        listrunner = g_list_next(listrunner);
-    }
-
-    cairo_stroke(cr);
-
-    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
-}
-
 // updates the drawing area based on global state
 static gboolean update_drawing_area() 
 {
@@ -126,6 +82,68 @@ static gboolean update_drawing_area()
     gdk_window_end_draw_frame(window,drawingContext);
     cairo_region_destroy(cairoRegion);
     g_free(alloc);
+
+    return TRUE;
+}
+
+// connect to that to get painting (and future dragging) abilities
+static gint motion_notify_event( GtkWidget *widget,
+                                 GdkEventMotion *event )
+{
+    int x, y, x_translated, y_translated;
+    GdkModifierType state;
+
+    // get coords
+    if (event->is_hint) {
+        gdk_window_get_device_position (event->window, device, &x, &y, &state);
+    } else {
+        x = event->x;
+        y = event->y;
+        state = event->state;
+    }
+
+    // strokes
+    if (state == GDK_BUTTON1_MASK) {
+        x_translated = (x - offset_x - mid_x) / scale;
+        y_translated = (y - offset_y - mid_y) / scale;
+        if (is_stroking) {
+            coord_t* temp = g_new(coord_t, 1);
+            temp->x = x_translated;
+            temp->y = y_translated;
+            coords = g_list_append(coords, temp);
+            pix = draw_line(before_action, coords, &color1, radius);
+            update_drawing_area();
+        } else {
+            is_stroking = true;
+            before_action = pix;
+            update_drawing_area();
+        }
+    } else {
+        if (is_stroking) {
+            pix = draw_line(before_action, coords, &color1, radius);
+            g_list_free(coords);
+            coords = NULL;
+            update_drawing_area();
+        }
+        is_stroking = false;
+    }
+
+    // image dragging
+    if (state == GDK_BUTTON2_MASK) {
+        if (is_dragging) {
+            offset_x = offset_old_x - (dragstart_x - x);
+            offset_y = offset_old_y - (dragstart_y - y);
+            update_drawing_area();
+        } else {
+            is_dragging = true;
+            offset_old_x = offset_x;
+            offset_old_y = offset_y;
+            dragstart_x = x;
+            dragstart_y = y;
+        }
+    } else {
+        is_dragging = false;
+    }
 
     return TRUE;
 }
@@ -199,77 +217,10 @@ static gboolean mouse_scroll( GtkWidget *widget,
                               GdkEventScroll *event,
                               gpointer data) 
 {
-    /* if (event->state == GDK_CONTROL_MASK) { */
-        if (event->direction == GDK_SCROLL_UP) {
-            increase_scale();
-        }
-        if (event->direction == GDK_SCROLL_DOWN) {
-            decrease_scale();
-        }
-        return TRUE;
-    /* } */
-    /* return FALSE; */
-}
-
-// connect to that to get painting (and future dragging) abilities
-static gint motion_notify_event( GtkWidget *widget,
-                                 GdkEventMotion *event )
-{
-    int x, y, x_translated, y_translated;
-    GdkModifierType state;
-
-    // get coords
-    if (event->is_hint) {
-        gdk_window_get_device_position (event->window, device, &x, &y, &state);
-    } else {
-        x = event->x;
-        y = event->y;
-        state = event->state;
-    }
-      
-    // strokes
-    if (state & GDK_BUTTON1_MASK) {
-        x_translated = (x - offset_x - mid_x) / scale;
-        y_translated = (y - offset_y - mid_y) / scale;
-        if (is_stroking) {
-            coord_t* temp = g_new(coord_t, 1);
-            temp->x = x_translated;
-            temp->y = y_translated;
-            coords = g_list_append(coords, temp);
-            pix = draw_line(before_action);
-            update_drawing_area();
-        } else {
-            is_stroking = true;
-            before_action = pix;
-            update_drawing_area();
-        }
-    } else {
-        if (is_stroking) {
-            pix = draw_line(before_action);
-            g_list_free(coords);
-            coords = NULL;
-            update_drawing_area();
-        }
-        is_stroking = false;
-    }
-
-    // image dragging
-    if (state & GDK_BUTTON2_MASK) {
-        if (is_dragging) {
-            offset_x = offset_old_x - (dragstart_x - x);
-            offset_y = offset_old_y - (dragstart_y - y);
-            update_drawing_area();
-        } else {
-            is_dragging = true;
-            offset_old_x = offset_x;
-            offset_old_y = offset_y;
-            dragstart_x = x;
-            dragstart_y = y;
-        }
-    } else {
-        is_dragging = false;
-    }
-
+    if (event->direction == GDK_SCROLL_UP)
+        increase_scale();
+    if (event->direction == GDK_SCROLL_DOWN)
+        decrease_scale();
     return TRUE;
 }
 
@@ -326,8 +277,8 @@ static void change_radius(GtkRange *range)
 // get sane scaling default based on the image size at app launch
 float get_sane_scale() 
 {
-    return 1;
     // TODO: fix
+    return 1;
 }
 
 // global keybinds
@@ -352,17 +303,17 @@ gboolean my_key_press(GtkWidget *widget,
     if (event->keyval == 'x')
         undo_all_changes();
     if (event->keyval == 'q') {
-        // TODO: the save destination shoule have been the second argument
         gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
         gtk_main_quit();
     }
     if (event->keyval == 'c') {
-        // TODO: still doesn't _quite_ work?
-        GtkClipboard *clipboard = gtk_clipboard_get_for_display(display,
-                        GDK_SELECTION_CLIPBOARD);
+        // TODO: fix
+        // X clipboard is weird: It only holds the content of I set while the app
+        // is still running. Unless that task it is explicitly given to a clipboard
+        // manager, maybe just shell-out with xclip here for now.
+        GtkClipboard *clipboard;
+        clipboard = gtk_clipboard_get_for_display(display, GDK_SELECTION_CLIPBOARD);
         gtk_clipboard_set_image(clipboard, pix);
-        // the application has to remain open long enough to
-        // copy the image, closing it right after here won't work
     }
     return FALSE;
 }
@@ -395,6 +346,7 @@ int main(int argc, char *argv[])
     // gtk stuff
 
     gtk_init(&argc, &argv);
+
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
