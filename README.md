@@ -7,11 +7,13 @@ This should be a program that helps with quick annotations in screenshots made w
 ## Keybinds
 |Keys|Action|
 |---|---|
-|h, j, k, l, holding the middle mouse button |moving the image|
-|u, i, mouse scrolling |scaling the image|
-|q |quit and save the image (currently to file.png)|
-|c |copy the current image to the clipboard|
-|x |undo all changes|
+|holding left mouse button|painting|
+|holding right mouse button|erasing|
+|holding the middle mouse button, h, j, k, l|moving the image|
+|mouse scrolling, u, i|scaling the image|
+|q|quit and save the image|
+|c|copy the current image to the clipboard|
+|x|undo all changes|
 
 ## Video
 
@@ -23,7 +25,7 @@ This should be a program that helps with quick annotations in screenshots made w
 - [ ] make the popup better looking
 - [x] add clipboard support
 - [x] interpolate between two drawn dots to create a more smooth line
-- [ ] eraser
+- [x] eraser
 - [ ] text tool
 
 my first C project - don't be harsh

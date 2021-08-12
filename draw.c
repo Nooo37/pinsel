@@ -1,26 +1,20 @@
 #include <gtk/gtk.h>
 #include "draw.h"
 
-GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on, 
-                     GList *positions, 
-                     GdkRGBA *color, 
-                     int width)
+cairo_surface_t* strokes_to_surface(GList *positions,
+                                    GdkRGBA *color,
+                                    int width,
+                                    int img_width,
+                                    int img_height)
 {
     cairo_surface_t *surface;
     cairo_t *cr;
     coord_t *value;
     GList *listrunner;
-    int img_height, img_width;
 
-    img_width = gdk_pixbuf_get_width(to_be_drawn_on);
-    img_height = gdk_pixbuf_get_height(to_be_drawn_on);
-    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 
-                    gdk_pixbuf_get_width(to_be_drawn_on), 
-                    gdk_pixbuf_get_height(to_be_drawn_on));
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, img_width, img_height);
     cr = cairo_create(surface);
 
-    gdk_cairo_set_source_pixbuf(cr, to_be_drawn_on, 0, 0);
-    cairo_paint(cr);
     cairo_set_source_rgba(cr, color->red, color->green, color->blue, color->alpha);
     cairo_set_line_width(cr, width);
     cairo_set_line_cap(cr, CAIRO_LINE_CAP_ROUND);
@@ -28,7 +22,7 @@ GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on,
 
     listrunner = g_list_first(positions);
     if (listrunner == NULL) {
-        return to_be_drawn_on;
+        return surface;
     }
 
     // start at the first entry
@@ -43,6 +37,29 @@ GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on,
     }
 
     cairo_stroke(cr);
+
+    return surface;
+}
+
+GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on, 
+                     GList *positions, 
+                     GdkRGBA *color, 
+                     int width)
+{
+    cairo_surface_t *surface, *strokes;
+    cairo_t *cr;
+    int img_height, img_width;
+
+    img_width = gdk_pixbuf_get_width(to_be_drawn_on);
+    img_height = gdk_pixbuf_get_height(to_be_drawn_on);
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, img_width, img_height);
+    cr = cairo_create(surface);
+    strokes = strokes_to_surface(positions, color, width, img_width, img_height);
+
+    gdk_cairo_set_source_pixbuf(cr, to_be_drawn_on, 0, 0);
+    cairo_paint(cr);
+    cairo_set_source_surface(cr, strokes, 0, 0);
+    cairo_paint(cr);
 
     return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 }
@@ -80,3 +97,44 @@ GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
     return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 }
 
+extern GdkPixbuf* erase_area(GdkPixbuf *original,
+                             GdkPixbuf *current,
+                             cairo_surface_t *mask)
+{
+    cairo_t *cr;
+    cairo_surface_t *surface;
+    int img_height, img_width;
+
+    // assertion: original and current have the same height and width
+    img_width = gdk_pixbuf_get_width(original);
+    img_height = gdk_pixbuf_get_height(original);
+
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 
+                    img_width, img_height);
+    cr = cairo_create(surface);
+    gdk_cairo_set_source_pixbuf(cr, current, 0, 0);
+    cairo_paint(cr);
+    gdk_cairo_set_source_pixbuf(cr, original, 0, 0);
+    cairo_mask_surface(cr, mask, 0, 0);
+    cairo_fill(cr);
+
+    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+}
+
+extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
+                                   GdkPixbuf *current,
+                                   GList *positions,
+                                   int width,
+                                   float alpha)
+{
+    cairo_surface_t *strokes;
+    GdkRGBA color;
+    int img_height, img_width;
+
+    color.red = color.green = color.blue = 0;
+    color.alpha = alpha;
+    img_width = gdk_pixbuf_get_width(original);
+    img_height = gdk_pixbuf_get_height(original);
+    strokes = strokes_to_surface(positions, &color, width, img_width, img_height);
+    return erase_area(original, current, strokes);
+}

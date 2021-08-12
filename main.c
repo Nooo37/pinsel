@@ -33,6 +33,7 @@ int offset_y = 0;
 
 // brush settings
 bool is_stroking = false;
+bool is_erasing = false;
 GdkRGBA color1; // primary color
 GdkRGBA color2; // secondary color
 int radius = 10;
@@ -102,10 +103,11 @@ static gint motion_notify_event( GtkWidget *widget,
         state = event->state;
     }
 
-    // strokes
+    x_translated = (x - offset_x - mid_x) / scale;
+    y_translated = (y - offset_y - mid_y) / scale;
+
+    // strokes drawing
     if (state == GDK_BUTTON1_MASK) {
-        x_translated = (x - offset_x - mid_x) / scale;
-        y_translated = (y - offset_y - mid_y) / scale;
         if (is_stroking) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
@@ -126,6 +128,30 @@ static gint motion_notify_event( GtkWidget *widget,
             update_drawing_area();
         }
         is_stroking = false;
+    }
+
+    // strokes erase
+    if (state == GDK_BUTTON3_MASK) {
+        if (is_erasing) {
+            coord_t* temp = g_new(coord_t, 1);
+            temp->x = x_translated;
+            temp->y = y_translated;
+            coords = g_list_append(coords, temp);
+            pix = erase_under_line(old, before_action, coords, radius, 1.0);
+            update_drawing_area();
+        } else {
+            is_erasing = true;
+            before_action = pix;
+            update_drawing_area();
+        }
+    } else {
+        if (is_erasing) {
+            pix = erase_under_line(old, before_action, coords, radius, 1.0);
+            g_list_free(coords);
+            coords = NULL;
+            update_drawing_area();
+        }
+        is_erasing = false;
     }
 
     // image dragging
