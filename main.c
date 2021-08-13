@@ -4,17 +4,21 @@
 
 #include "draw.h"
 
+#define TEMP_OUT_FILE "/tmp/nanoanno_output.png"
+#define TEMP_IN_FILE "/tmp/nanoanno_input.png"
 const int DELTA_MOVE = 20;
 const float DELTA_ZOOM = 0.04;
+const int BUF_SIZE = 1024;
 
 // global state. I hope that is how one does C
-char *dest = "file.png";
+char *dest = NULL;
 
 // Gtk
 GdkDisplay *display;
 GdkSeat *seat;
 GdkDevice *device;
 
+GtkWidget *window;
 GtkWidget *canvas;
 
 // pixbufs
@@ -45,7 +49,6 @@ int dragstart_x = 0;
 int dragstart_y = 0;
 int offset_old_x = 0;
 int offset_old_y = 0;
-
 
 // updates the drawing area based on global state
 static gboolean update_drawing_area() 
@@ -307,13 +310,89 @@ float get_sane_scale()
     return 1;
 }
 
+// writes the stdin stream into a png file to process it further
+void write_stdin_to_file()
+{
+    void *content = malloc(BUF_SIZE);
+
+    FILE *fp = fopen(TEMP_IN_FILE, "w");
+
+    if (fp == 0)
+        printf("Error: Couldn't open the temp file\n");
+
+    int read;
+    while ((read = fread(content, 1, BUF_SIZE, stdin))) {
+        fwrite(content, read, 1, fp);
+    }
+    if (ferror(stdin))
+        printf("Error: Couldn't read from stdin\n");
+
+    fclose(fp);
+}
+
+
+// everything that needs to happen for cleanly quitting the app
+void quit()
+{
+    // the current image to stdout
+    if (isatty(1) != 1) { // the first 1 refers to stdout
+        remove(TEMP_OUT_FILE);
+        gdk_pixbuf_save(pix, TEMP_OUT_FILE, "png", NULL, NULL);
+        FILE *a = fopen(TEMP_OUT_FILE, "r");
+        int n;
+        char s[65536];
+        while ((n = fread(s, 1, sizeof(s), a))) {
+            fwrite(s, 1, n, stdout);
+        }
+    }
+    // quit gtk
+    gtk_main_quit();
+}
+
+// saves the image
+void save()
+{
+    if (dest == NULL) {
+        // TODO: open file picker
+    } else {
+        gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
+    }
+}
+
+// loads the image into the application
+int load(char* filename)
+{
+    GError *err = NULL;
+
+    if (filename == NULL) 
+        return 1;
+    pix = gdk_pixbuf_new_from_file(filename, &err);
+    if (err) {
+        g_error_free(err);
+        return 1;
+    }
+    old = gdk_pixbuf_copy(pix);
+    img_width = gdk_pixbuf_get_width(pix);
+    img_height = gdk_pixbuf_get_height(pix);
+    return 0;
+}
+
 // global keybinds
 gboolean my_key_press(GtkWidget *widget,
                       GdkEventKey *event,
                       gpointer user_data) 
 {
-    if (event->state == GDK_CONTROL_MASK && event->keyval == 'w')
-        gtk_main_quit();
+    if (event->keyval == 'w')
+        quit();
+    if (event->keyval == 's')
+        save();
+    if (event->keyval == 'q') {
+        save();
+        quit();
+    }
+    if (event->keyval == 'x')
+        undo_all_changes();
+    // movement, zoom
     if (event->keyval == 'u')
         increase_scale();
     if (event->keyval == 'i')
@@ -326,53 +405,18 @@ gboolean my_key_press(GtkWidget *widget,
         decrease_offset_y();
     if (event->keyval == 'k')
         increase_offset_y();
-    if (event->keyval == 'x')
-        undo_all_changes();
-    if (event->keyval == 'q') {
-        gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
-        gtk_main_quit();
-    }
-    if (event->keyval == 'c') {
-        // TODO: fix
-        // X clipboard is weird: It only holds the content of I set while the app
-        // is still running. Unless that task it is explicitly given to a clipboard
-        // manager, maybe just shell-out with xclip here for now.
-        GtkClipboard *clipboard;
-        clipboard = gtk_clipboard_get_for_display(display, GDK_SELECTION_CLIPBOARD);
-        gtk_clipboard_set_image(clipboard, pix);
-    }
     return FALSE;
 }
 
-// main
-int main(int argc, char *argv[])
+// build the gtk ui and connects all signals
+int build_ui()
 {
-    GError *err = NULL;
     GtkBuilder *builder; 
-    GtkWidget *window;
     GtkButton *undo_button;
     GtkButton *color_switch_button;
     GtkColorChooser *color_picker_primary;
     GtkColorChooser *color_picker_secondary;
     GtkRange *radius_scale;
-
-    // init image related
-
-    dest = argv[2];
-    pix = gdk_pixbuf_new_from_file(argv[1], &err);
-    if(err) {
-        printf("Error : %s\n", err->message);
-        g_error_free(err);
-        return FALSE;
-    }
-    old = gdk_pixbuf_copy(pix);
-    img_width = gdk_pixbuf_get_width(pix);
-    img_height = gdk_pixbuf_get_height(pix);
-
-    // gtk stuff
-
-    gtk_init(&argc, &argv);
-
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
@@ -381,13 +425,13 @@ int main(int argc, char *argv[])
 
     // building and getting all the widgets, connecting signals
     builder = gtk_builder_new();
-    gtk_builder_add_from_file (builder, "window.glade", NULL);
+    gtk_builder_add_from_file (builder, "window.ui", NULL);
 
     // main window and its callbacks
     window = GTK_WIDGET(gtk_builder_get_object(builder, "window1"));
     gtk_builder_connect_signals(builder, NULL);
     g_signal_connect(G_OBJECT(window), "destroy", 
-                    G_CALLBACK(gtk_main_quit), NULL);
+                    G_CALLBACK(quit), NULL);
     g_signal_connect(G_OBJECT(window), "key-press-event", 
                     G_CALLBACK(my_key_press), NULL);
 
@@ -444,8 +488,50 @@ int main(int argc, char *argv[])
     gtk_widget_show(window);                
     scale = get_sane_scale();
 
+    return 0;
+}
+
+// main
+int main(int argc, char *argv[])
+{
+    char *image_to_edit = NULL; // path to the image
+
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
+            i++;
+            if (i >= argc) {
+                printf("Missing argument for -o\n");
+                return 1;
+            } else {
+                dest = argv[i];
+            }
+        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            // TODO: help text
+            printf("PR a help text please\n");
+            return 1;
+        }
+    }
+
+    // initalize the image
+
+    if (argc > 1) { // is the image a command line argument?
+        image_to_edit = argv[1];
+    }
+
+    if (isatty(0) != 1) { // 0 refers to stdin, is the image coming in a pipe?
+        write_stdin_to_file();
+        image_to_edit = TEMP_IN_FILE;
+    } 
+
+    // TODO: show something when it's started without a file as arg or stdin
+    load(image_to_edit);
+
+    gtk_init(&argc, &argv);
+
+    int t = build_ui();
+
     gtk_main();
 
-    return 0;
+    return 0 | t;
 }
 
