@@ -10,7 +10,22 @@ const int DELTA_MOVE = 20;
 const float DELTA_ZOOM = 0.04;
 const int BUF_SIZE = 1024;
 
+typedef enum {
+    BRUSH,
+    ERASER,
+    TEXT
+} Mode;
+
+// TODO: instead of is_stroking, is_erasing etc
+typedef enum {
+    BRUSHING,
+    ERASING,
+    TEXTING,
+    IDLE
+} Activity;
+
 // global state. I hope that is how one does C
+Mode mode = BRUSH;
 char *dest = NULL;
 
 // Gtk
@@ -20,6 +35,10 @@ GdkDevice *device;
 
 GtkWidget *window;
 GtkWidget *canvas;
+GtkDialog *text_dialog;
+GtkToggleButton *brush_toggle;
+GtkToggleButton *eraser_toggle;
+GtkToggleButton *text_toggle;
 
 // pixbufs
 GdkPixbuf *pix;
@@ -49,6 +68,16 @@ int dragstart_x = 0;
 int dragstart_y = 0;
 int offset_old_x = 0;
 int offset_old_y = 0;
+
+
+// text tool
+bool is_texting = false;
+gchar *text = "";
+gchar *font = "Sans";
+int text_x = 20;
+int text_y = 20;
+gint font_size = 12;
+
 
 // updates the drawing area based on global state
 static gboolean update_drawing_area() 
@@ -110,7 +139,8 @@ static gint motion_notify_event( GtkWidget *widget,
     y_translated = (y - offset_y - mid_y) / scale;
 
     // strokes drawing
-    if (state == GDK_BUTTON1_MASK) {
+    if ((state & GDK_BUTTON1_MASK && mode == BRUSH) ||
+                    ((state & GDK_BUTTON3_MASK && mode == ERASER))) {
         if (is_stroking) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
@@ -134,7 +164,8 @@ static gint motion_notify_event( GtkWidget *widget,
     }
 
     // strokes erase
-    if (state == GDK_BUTTON3_MASK) {
+    if ((state & GDK_BUTTON3_MASK && mode == BRUSH) ||
+                    ((state & GDK_BUTTON1_MASK && mode == ERASER))) {
         if (is_erasing) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
@@ -158,7 +189,7 @@ static gint motion_notify_event( GtkWidget *widget,
     }
 
     // image dragging
-    if (state == GDK_BUTTON2_MASK) {
+    if (state & GDK_BUTTON2_MASK) {
         if (is_dragging) {
             offset_x = offset_old_x - (dragstart_x - x);
             offset_y = offset_old_y - (dragstart_y - y);
@@ -175,6 +206,12 @@ static gint motion_notify_event( GtkWidget *widget,
     }
 
     return TRUE;
+}
+
+void temporary_text_display()
+{
+    pix = draw_text(before_action, text, &color1, font, font_size, text_x, text_y);
+    update_drawing_area();
 }
 
 // the function to connect to, to update the drawing area on resize
@@ -234,10 +271,26 @@ static gboolean decrease_offset_y()
     return FALSE;
 }
 
-// maybe I'll need that later for detecting a mouse button release for dragging
 static gint button_press_event( GtkWidget      *widget,
                                 GdkEventButton *event )
 {
+    int x, y;
+
+    if (mode == TEXT) {
+        // get coords
+        x = event->x;
+        y = event->y;
+        text_x = (x - offset_x - mid_x) / scale;
+        text_y = (y - offset_y - mid_y) / scale;
+
+        if (is_texting) {
+            temporary_text_display();
+        } else {
+            is_texting = true;
+            before_action = pix;
+            gtk_widget_show((GtkWidget*) text_dialog);
+        }
+    }
     return TRUE;
 }
 
@@ -271,6 +324,30 @@ static void switch_colors()
     color2 = temp;
 }
 
+static void quit_text()
+{
+    /* mode = BRUSH; */
+    is_texting = false;
+    gtk_toggle_button_set_active(brush_toggle, TRUE);
+    gtk_toggle_button_set_active(eraser_toggle, FALSE);
+    gtk_toggle_button_set_active(text_toggle, FALSE);
+    gtk_widget_hide((GtkWidget*) text_dialog);
+}
+
+static void quit_text_tool_ok()
+{
+    quit_text();
+    before_action = pix;
+    update_drawing_area();
+}
+
+static void quit_text_tool_cancel()
+{
+    quit_text();
+    pix = before_action;
+    update_drawing_area();
+}
+
 // update the primary colors button
 static void update_color_primary(GtkButton *button, gpointer user_data)
 {
@@ -297,11 +374,76 @@ static void change_color2(GtkColorButton *color_button)
     gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color2);
 }
 
-// connect to that to get the slider to do its job
-static void change_radius(GtkRange *range)
+static void update_on_brush_toggle(GtkToggleButton *brush_toggle, gpointer user_data)
 {
-    radius = gtk_range_get_value(range);
+    gboolean button_state;
+    button_state = gtk_toggle_button_get_active(brush_toggle);
+
+    if (button_state == TRUE) {
+        mode = BRUSH;
+        gtk_toggle_button_set_active(eraser_toggle, FALSE);
+        gtk_toggle_button_set_active(text_toggle, FALSE);
+    } else {
+        if (mode == BRUSH)
+            gtk_toggle_button_set_active(brush_toggle, TRUE);
+    }
 }
+
+static void update_on_eraser_toggle(GtkToggleButton *eraser_toggle)
+{
+    gboolean button_state;
+    button_state = gtk_toggle_button_get_active(eraser_toggle);
+
+    if (button_state == TRUE) {
+        mode = ERASER;
+        gtk_toggle_button_set_active(text_toggle, FALSE);
+        gtk_toggle_button_set_active(brush_toggle, FALSE);
+    } else {
+        if (mode == ERASER)
+            gtk_toggle_button_set_active(eraser_toggle, TRUE);
+    }
+}
+
+static void update_on_text_toggle(GtkToggleButton *text_toggle)
+{
+    gboolean button_state;
+    button_state = gtk_toggle_button_get_active(text_toggle);
+
+    if (button_state == TRUE) {
+        mode = TEXT;
+        gtk_toggle_button_set_active(eraser_toggle, FALSE);
+        gtk_toggle_button_set_active(brush_toggle, FALSE);
+    } else {
+        if (mode == TEXT)
+            gtk_toggle_button_set_active(text_toggle, TRUE);
+    }
+}
+
+static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
+{
+    GtkTextIter start, end;
+
+    gtk_text_buffer_get_bounds(textbuffer, &start, &end);
+    text = gtk_text_buffer_get_text(textbuffer, &start, &end, TRUE);
+    temporary_text_display();
+}
+
+static void on_font_set(GtkFontButton* button, gpointer user_data)
+{
+    const char* font_name = pango_font_family_get_name(gtk_font_chooser_get_font_family((GtkFontChooser*) button));
+    /* char* font_face = pango_font_face_get_face_name(gtk_font_chooser_get_font_face((GtkFontChooser*) button)); */
+    // TODO: support for font faces
+    font_size = gtk_font_chooser_get_font_size((GtkFontChooser*) button) / 1000;
+    font = font_name;
+    temporary_text_display();
+}
+
+// connect to that to get the slider to do its job
+static void change_radius(GtkAdjustment *adjust)
+{
+    radius = gtk_adjustment_get_value(adjust);
+}
+
 
 // get sane scaling default based on the image size at app launch
 float get_sane_scale() 
@@ -413,10 +555,12 @@ int build_ui()
 {
     GtkBuilder *builder; 
     GtkButton *undo_button;
-    GtkButton *color_switch_button;
+    GtkButton *color_switch_button, *text_dialog_ok, *text_dialog_cancel;
     GtkColorChooser *color_picker_primary;
     GtkColorChooser *color_picker_secondary;
-    GtkRange *radius_scale;
+    GtkTextBuffer *textbuffer;
+    GtkAdjustment *radius_scale;
+    GtkFontButton *font_button;
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
@@ -478,11 +622,44 @@ int build_ui()
     gtk_color_chooser_get_rgba(color_picker_primary, &color1);
     gtk_color_chooser_get_rgba(color_picker_secondary, &color2);
 
-    // slider
-    radius_scale = GTK_RANGE(gtk_builder_get_object(builder, "radius_scale"));
+    // modi toggle buttons
+
+    brush_toggle = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "toggle_brush"));
+    eraser_toggle = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "toggle_eraser"));
+    text_toggle = GTK_TOGGLE_BUTTON(gtk_builder_get_object(builder, "toggle_text"));
+
+    g_signal_connect(G_OBJECT(brush_toggle), "toggled", 
+                    G_CALLBACK(update_on_brush_toggle), NULL);
+    g_signal_connect(G_OBJECT(eraser_toggle), "toggled", 
+                    G_CALLBACK(update_on_eraser_toggle), NULL);
+    g_signal_connect(G_OBJECT(text_toggle), "toggled", 
+                    G_CALLBACK(update_on_text_toggle), NULL);
+
+    gtk_toggle_button_set_active(brush_toggle, TRUE);
+    gtk_toggle_button_set_active(eraser_toggle, FALSE);
+    gtk_toggle_button_set_active(text_toggle, FALSE);
+
+    // text dialog
+    text_dialog = GTK_DIALOG(gtk_builder_get_object(builder, "text_dialog"));
+    gtk_window_set_keep_above((GtkWindow*) text_dialog, TRUE);
+    text_dialog_ok = GTK_BUTTON(gtk_builder_get_object(builder, "text_dialog_ok"));
+    g_signal_connect(G_OBJECT(text_dialog_ok), "pressed", 
+                    G_CALLBACK(quit_text_tool_ok), NULL);
+    text_dialog_cancel = GTK_BUTTON(gtk_builder_get_object(builder, "text_dialog_cancel"));
+    g_signal_connect(G_OBJECT(text_dialog_cancel), "pressed", 
+                    G_CALLBACK(quit_text_tool_cancel), NULL);
+    textbuffer = GTK_TEXT_BUFFER(gtk_builder_get_object(builder, "textbuffer"));
+    g_signal_connect(G_OBJECT(textbuffer), "changed", 
+                    G_CALLBACK(update_on_text_buffer_change), NULL);
+    font_button = GTK_FONT_BUTTON(gtk_builder_get_object(builder, "font_picker"));
+    g_signal_connect(G_OBJECT(font_button), "font_set", 
+                    G_CALLBACK(on_font_set), NULL);
+
+    // scale
+    radius_scale = GTK_ADJUSTMENT(gtk_builder_get_object(builder, "radius_scale"));
     g_signal_connect(G_OBJECT(radius_scale), "value-changed", 
                     G_CALLBACK(change_radius), NULL);
-    gtk_range_set_value(radius_scale, radius);
+
 
     // start
     gtk_widget_show(window);                

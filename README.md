@@ -42,6 +42,6 @@ First you select your screenshot through maim like you are used to. The result g
 - [x] add clipboard support
 - [x] interpolate between two drawn dots to create a more smooth line
 - [x] eraser
-- [ ] text tool
+- [x] text tool
 
 my first C project - don't be harsh
