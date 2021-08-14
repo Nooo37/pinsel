@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 #include "draw.h"
 
+
 cairo_surface_t* strokes_to_surface(GList *positions,
                                     GdkRGBA *color,
                                     int width,
@@ -93,6 +94,27 @@ GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
     cairo_set_source_rgba(cr, color->red, color->green, color->blue, color->alpha);
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, text);  
+
+    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+}
+
+extern GdkPixbuf* merge_pixbufs(GdkPixbuf *top_one,
+                                GdkPixbuf *bottom_one)
+{
+    cairo_t *cr;
+    cairo_surface_t *surface;
+    int img_height, img_width;
+
+    img_width = gdk_pixbuf_get_width(top_one);
+    img_height = gdk_pixbuf_get_height(bottom_one);
+
+    surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 
+                    img_width, img_height);
+    cr = cairo_create(surface);
+    gdk_cairo_set_source_pixbuf(cr, bottom_one, 0, 0);
+    cairo_paint(cr);
+    gdk_cairo_set_source_pixbuf(cr, top_one, 0, 0);
+    cairo_paint(cr);
 
     return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 }

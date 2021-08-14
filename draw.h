@@ -17,6 +17,15 @@ typedef struct
 } coord_t;
 
 /*
+ * Merges two pixbufs 
+ *
+ * top_one: The pixbufs that gets drawn on the top
+ * bottom_one: The pixbuf that gets drawn on the bottom
+ */
+extern GdkPixbuf* merge_pixbufs(GdkPixbuf *top_one,
+                                GdkPixbuf *bottom_one);
+
+/*
  * Draws a line on the given pixbuf and returns the result
  *
  * to_be_drawn_on: The pixbuf on which the line will be drawn
