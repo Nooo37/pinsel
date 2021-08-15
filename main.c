@@ -1,14 +1,14 @@
-#include <stdbool.h>
 #include <gtk/gtk.h>
 #include <string.h>
-
 #include "draw.h"
+#include "history.h"
 
 #define TEMP_OUT_FILE "/tmp/nanoanno_output.png"
 #define TEMP_IN_FILE "/tmp/nanoanno_input.png"
-const int DELTA_MOVE = 20;
-const float DELTA_ZOOM = 0.04;
-const int BUF_SIZE = 1024;
+#define UI_FILE "window.ui"
+#define DELTA_MOVE 20
+#define DELTA_ZOOM 0.04
+#define BUF_SIZE 1024
 
 typedef enum {
     BRUSH,
@@ -16,16 +16,17 @@ typedef enum {
     TEXT
 } Mode;
 
-// TODO: instead of is_stroking, is_erasing etc
 typedef enum {
     BRUSHING,
     ERASING,
     TEXTING,
+    DRAGGING,
     IDLE
 } Activity;
 
 // global state. I hope that is how one does C
 Mode mode = BRUSH;
+Activity activity = IDLE;
 char *dest = NULL;
 
 // Gtk
@@ -48,22 +49,19 @@ int img_width = 0;
 int img_height = 0;
 
 // geometry
-float scale = 0.1;
+float scale = 1;
 int mid_x = 0;
 int mid_y = 0;
 int offset_x = 0;
 int offset_y = 0;
 
 // brush settings
-bool is_stroking = false;
-bool is_erasing = false;
 GdkRGBA color1; // primary color
 GdkRGBA color2; // secondary color
 int radius = 10;
 GList *coords = NULL;
 
 // mouse dragging
-bool is_dragging = false;
 int dragstart_x = 0;
 int dragstart_y = 0;
 int offset_old_x = 0;
@@ -71,7 +69,6 @@ int offset_old_y = 0;
 
 
 // text tool
-bool is_texting = false;
 gchar *text = "";
 gchar *font = "Sans";
 int text_x = 20;
@@ -141,7 +138,7 @@ static gint motion_notify_event( GtkWidget *widget,
     // strokes drawing
     if ((state & GDK_BUTTON1_MASK && mode == BRUSH) ||
                     ((state & GDK_BUTTON3_MASK && mode == ERASER))) {
-        if (is_stroking) {
+        if (activity == BRUSHING) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
             temp->y = y_translated;
@@ -149,24 +146,25 @@ static gint motion_notify_event( GtkWidget *widget,
             pix = draw_line(before_action, coords, &color1, radius);
             update_drawing_area();
         } else {
-            is_stroking = true;
+            activity = BRUSHING;
             before_action = pix;
             update_drawing_area();
         }
     } else {
-        if (is_stroking) {
+        if (activity == BRUSHING) {
             pix = draw_line(before_action, coords, &color1, radius);
+            history_add_one(pix);
             g_list_free(coords);
             coords = NULL;
             update_drawing_area();
+            activity = IDLE;
         }
-        is_stroking = false;
     }
 
     // strokes erase
     if ((state & GDK_BUTTON3_MASK && mode == BRUSH) ||
                     ((state & GDK_BUTTON1_MASK && mode == ERASER))) {
-        if (is_erasing) {
+        if (activity == ERASING) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
             temp->y = y_translated;
@@ -174,35 +172,37 @@ static gint motion_notify_event( GtkWidget *widget,
             pix = erase_under_line(old, before_action, coords, radius, 1.0);
             update_drawing_area();
         } else {
-            is_erasing = true;
+            activity = ERASING;
             before_action = pix;
             update_drawing_area();
         }
     } else {
-        if (is_erasing) {
+        if (activity == ERASING) {
             pix = erase_under_line(old, before_action, coords, radius, 1.0);
+            history_add_one(pix);
             g_list_free(coords);
             coords = NULL;
             update_drawing_area();
+            activity = IDLE;
         }
-        is_erasing = false;
     }
 
     // image dragging
     if (state & GDK_BUTTON2_MASK) {
-        if (is_dragging) {
+        if (activity == DRAGGING) {
             offset_x = offset_old_x - (dragstart_x - x);
             offset_y = offset_old_y - (dragstart_y - y);
             update_drawing_area();
         } else {
-            is_dragging = true;
+            activity = DRAGGING;
             offset_old_x = offset_x;
             offset_old_y = offset_y;
             dragstart_x = x;
             dragstart_y = y;
         }
     } else {
-        is_dragging = false;
+        if (activity == DRAGGING)
+            activity = IDLE;
     }
 
     return TRUE;
@@ -283,10 +283,10 @@ static gint button_press_event( GtkWidget      *widget,
         text_x = (x - offset_x - mid_x) / scale;
         text_y = (y - offset_y - mid_y) / scale;
 
-        if (is_texting) {
+        if (activity == TEXTING) {
             temporary_text_display();
         } else {
-            is_texting = true;
+            activity = TEXTING;
             before_action = pix;
             gtk_widget_show((GtkWidget*) text_dialog);
         }
@@ -327,7 +327,7 @@ static void switch_colors()
 static void quit_text()
 {
     /* mode = BRUSH; */
-    is_texting = false;
+    activity = IDLE;
     gtk_toggle_button_set_active(brush_toggle, TRUE);
     gtk_toggle_button_set_active(eraser_toggle, FALSE);
     gtk_toggle_button_set_active(text_toggle, FALSE);
@@ -338,6 +338,7 @@ static void quit_text_tool_ok()
 {
     quit_text();
     before_action = pix;
+    history_add_one(pix);
     update_drawing_area();
 }
 
@@ -472,6 +473,17 @@ void write_stdin_to_file()
     fclose(fp);
 }
 
+void undo()
+{
+    pix = history_undo_one();
+    update_drawing_area();
+}
+
+void redo()
+{
+    pix = history_redo_one();
+    update_drawing_area();
+}
 
 // everything that needs to happen for cleanly quitting the app
 void quit()
@@ -516,6 +528,7 @@ int load(char* filename)
     old = gdk_pixbuf_copy(pix);
     img_width = gdk_pixbuf_get_width(pix);
     img_height = gdk_pixbuf_get_height(pix);
+    history_init(old);
     return 0;
 }
 
@@ -554,7 +567,7 @@ gboolean my_key_press(GtkWidget *widget,
 int build_ui()
 {
     GtkBuilder *builder; 
-    GtkButton *undo_button;
+    GtkButton *undo_button, *redo_button;
     GtkButton *color_switch_button, *text_dialog_ok, *text_dialog_cancel;
     GtkColorChooser *color_picker_primary;
     GtkColorChooser *color_picker_secondary;
@@ -569,7 +582,7 @@ int build_ui()
 
     // building and getting all the widgets, connecting signals
     builder = gtk_builder_new();
-    gtk_builder_add_from_file (builder, "window.ui", NULL);
+    gtk_builder_add_from_file (builder, UI_FILE, NULL);
 
     // main window and its callbacks
     window = GTK_WIDGET(gtk_builder_get_object(builder, "window1"));
@@ -602,7 +615,10 @@ int build_ui()
 
     undo_button = GTK_BUTTON(gtk_builder_get_object(builder, "undo_button"));
     g_signal_connect(G_OBJECT(undo_button), "pressed", 
-                    G_CALLBACK(undo_all_changes), NULL);
+                    G_CALLBACK(undo), NULL);
+    redo_button = GTK_BUTTON(gtk_builder_get_object(builder, "redo_button"));
+    g_signal_connect(G_OBJECT(redo_button), "pressed", 
+                    G_CALLBACK(redo), NULL);
 
     // color picker
     color_picker_primary = GTK_COLOR_CHOOSER(gtk_builder_get_object(builder, "color_picker_primary"));
@@ -673,7 +689,7 @@ int main(int argc, char *argv[])
 {
     char *image_to_edit = NULL; // path to the image
 
-    for (int i = 2; i < argc; i++) {
+    for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
             i++;
             if (i >= argc) {
