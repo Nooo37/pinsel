@@ -1,4 +1,7 @@
 .DEFAULT_GOAL := nanoanno
+CFILES   = $(wildcard *.c)
+OBJFILES = $(CFILES:.c=.o)
+
 CC := gcc
 LDLIBS := $(shell pkg-config --cflags --libs gtk+-3.0)
 
@@ -19,3 +22,7 @@ install: nanoanno
 	cp nanoanno /usr/local/bin/nanoanno
 	mkdir -p /usr/local/lib/nanoanno/
 	cp window.ui /usr/local/lib/nanoanno/window.ui
+
+.PHONY: clean
+clean:
+	rm -f $(OBJFILES) $(.DEFAULT_GOAL)
