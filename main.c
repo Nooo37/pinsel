@@ -1,11 +1,14 @@
+#include <stdlib.h>
+#include <libgen.h>
 #include <gtk/gtk.h>
-#include <string.h>
 #include "draw.h"
 #include "history.h"
 
 #define TEMP_OUT_FILE "/tmp/nanoanno_output.png"
 #define TEMP_IN_FILE "/tmp/nanoanno_input.png"
 #define UI_FILE "window.ui"
+/* #define UI_FILE "/usr/local/lib/nanoanno/window.ui" */
+#define SANE_SCALE_MARGIN 0.03
 #define DELTA_MOVE 20
 #define DELTA_ZOOM 0.04
 #define BUF_SIZE 1024
@@ -54,6 +57,8 @@ int mid_x = 0;
 int mid_y = 0;
 int offset_x = 0;
 int offset_y = 0;
+int area_width;
+int area_height;
 
 // brush settings
 GdkRGBA color1; // primary color
@@ -67,14 +72,12 @@ int dragstart_y = 0;
 int offset_old_x = 0;
 int offset_old_y = 0;
 
-
 // text tool
 gchar *text = "";
 gchar *font = "Sans";
 int text_x = 20;
 int text_y = 20;
-gint font_size = 12;
-
+int font_size = 12;
 
 // updates the drawing area based on global state
 static gboolean update_drawing_area() 
@@ -82,8 +85,8 @@ static gboolean update_drawing_area()
     /* cairo_t *cr; */
     GtkAllocation *alloc = g_new(GtkAllocation, 1);
     gtk_widget_get_allocation(canvas, alloc);
-    int area_width = alloc->width;
-    int area_height = alloc->height;
+    area_width = alloc->width;
+    area_height = alloc->height;
 
     // initalize stuff
     /* cr = gdk_cairo_create(gtk_widget_get_window(canvas)); */
@@ -114,6 +117,27 @@ static gboolean update_drawing_area()
     g_free(alloc);
 
     return TRUE;
+}
+
+static void set_title_saved(gboolean is_saved)
+{
+    if (dest == NULL)
+        gtk_window_set_title((GtkWindow*) window, "*untitled");
+    else if (is_saved)
+        gtk_window_set_title((GtkWindow*) window, basename(dest));
+    else {
+        char *temp = (char*) malloc(100 * sizeof(char));
+        sprintf(temp, "*%s", basename(dest));
+        gtk_window_set_title((GtkWindow*) window, temp);
+        free(temp);
+    }
+}
+
+static void change()
+{
+    history_add_one(pix);
+    set_title_saved(FALSE);
+    update_drawing_area();
 }
 
 // connect to that to get painting (and future dragging) abilities
@@ -153,10 +177,9 @@ static gint motion_notify_event( GtkWidget *widget,
     } else {
         if (activity == BRUSHING) {
             pix = draw_line(before_action, coords, &color1, radius);
-            history_add_one(pix);
             g_list_free(coords);
             coords = NULL;
-            update_drawing_area();
+            change();
             activity = IDLE;
         }
     }
@@ -179,10 +202,9 @@ static gint motion_notify_event( GtkWidget *widget,
     } else {
         if (activity == ERASING) {
             pix = erase_under_line(old, before_action, coords, radius, 1.0);
-            history_add_one(pix);
             g_list_free(coords);
             coords = NULL;
-            update_drawing_area();
+            change();
             activity = IDLE;
         }
     }
@@ -309,10 +331,43 @@ static gboolean mouse_scroll( GtkWidget *widget,
 // undo all changes
 static void undo_all_changes() 
 {
-    pix = old;
+    pix = history_undo_all();
+    set_title_saved(FALSE);
     offset_x = 0;
     offset_y = 0;
     update_drawing_area();
+}
+
+static void fit_zoom()
+{
+    offset_x = 0;
+    offset_y = 0;
+    // TOOD: set scale to get_sane_scale
+    update_drawing_area();
+}
+
+static void flip_horizontally()
+{
+    pix = gdk_pixbuf_flip(pix, TRUE);
+    change();
+}
+
+static void flip_vertically()
+{
+    pix = gdk_pixbuf_flip(pix, FALSE);
+    change();
+}
+
+static void rotate_left()
+{
+    pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+    change();
+}
+
+static void rotate_right()
+{
+    pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_CLOCKWISE);
+    change();
 }
 
 // switch primary and secondary color
@@ -338,8 +393,7 @@ static void quit_text_tool_ok()
 {
     quit_text();
     before_action = pix;
-    history_add_one(pix);
-    update_drawing_area();
+    change();
 }
 
 static void quit_text_tool_cancel()
@@ -449,8 +503,10 @@ static void change_radius(GtkAdjustment *adjust)
 // get sane scaling default based on the image size at app launch
 float get_sane_scale() 
 {
-    // TODO: fix
-    return 1;
+    if ((img_width / img_height) > (area_width / area_height))
+        return (area_width / (float) img_width) * (1 - SANE_SCALE_MARGIN);
+    else
+        return (area_height / (float) img_height) * (1 - SANE_SCALE_MARGIN);
 }
 
 // writes the stdin stream into a png file to process it further
@@ -476,12 +532,14 @@ void write_stdin_to_file()
 void undo()
 {
     pix = history_undo_one();
+    set_title_saved(FALSE);
     update_drawing_area();
 }
 
 void redo()
 {
     pix = history_redo_one();
+    set_title_saved(FALSE);
     update_drawing_area();
 }
 
@@ -503,13 +561,19 @@ void quit()
     gtk_main_quit();
 }
 
+void save_as()
+{
+    // TODO: do
+}
+
 // saves the image
 void save()
 {
     if (dest == NULL) {
-        // TODO: open file picker
+        save_as();
     } else {
         gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
+        set_title_saved(TRUE);
     }
 }
 
@@ -547,10 +611,14 @@ gboolean my_key_press(GtkWidget *widget,
     }
     if (event->keyval == 'x')
         undo_all_changes();
-    // movement, zoom
     if (event->keyval == 'u')
+        undo();
+    if (event->keyval == 'r')
+        redo();
+    // movement, zoom
+    if (event->keyval == '+')
         increase_scale();
-    if (event->keyval == 'i')
+    if (event->keyval == '-')
         decrease_scale();
     if (event->keyval == 'h')
         increase_offset_x();
@@ -567,7 +635,11 @@ gboolean my_key_press(GtkWidget *widget,
 int build_ui()
 {
     GtkBuilder *builder; 
-    GtkButton *undo_button, *redo_button;
+    GtkButton *undo_button, *redo_button, 
+              *rotate_left_button, *rotate_right_button, 
+              *flip_horizontally_button, *flip_vertically_button,
+              *undo_all_button, *fit_zoom_button, *about_button,
+              *save_button, *save_as_button, *open_button, *shortcuts_button;
     GtkButton *color_switch_button, *text_dialog_ok, *text_dialog_cancel;
     GtkColorChooser *color_picker_primary;
     GtkColorChooser *color_picker_secondary;
@@ -676,11 +748,41 @@ int build_ui()
     g_signal_connect(G_OBJECT(radius_scale), "value-changed", 
                     G_CALLBACK(change_radius), NULL);
 
-
+    // everything in the popover
+    rotate_left_button = GTK_BUTTON(gtk_builder_get_object(builder, "rotate_left_button"));
+    g_signal_connect(G_OBJECT(rotate_left_button), "pressed", 
+                    G_CALLBACK(rotate_left), NULL);
+    rotate_right_button = GTK_BUTTON(gtk_builder_get_object(builder, "rotate_right_button"));
+    g_signal_connect(G_OBJECT(rotate_right_button), "pressed", 
+                    G_CALLBACK(rotate_right), NULL);
+    flip_horizontally_button = GTK_BUTTON(gtk_builder_get_object(builder, "flip_horizontally_button"));
+    g_signal_connect(G_OBJECT(flip_horizontally_button), "pressed", 
+                    G_CALLBACK(flip_horizontally), NULL);
+    flip_vertically_button = GTK_BUTTON(gtk_builder_get_object(builder, "flip_vertically_button"));
+    g_signal_connect(G_OBJECT(flip_vertically_button), "pressed", 
+                    G_CALLBACK(flip_vertically), NULL);
+    undo_all_button = GTK_BUTTON(gtk_builder_get_object(builder, "undo_all_button"));
+    g_signal_connect(G_OBJECT(undo_all_button), "pressed", 
+                    G_CALLBACK(undo_all_changes), NULL);
+    fit_zoom_button = GTK_BUTTON(gtk_builder_get_object(builder, "fit_zoom_button"));
+    g_signal_connect(G_OBJECT(fit_zoom_button), "pressed", 
+                    G_CALLBACK(fit_zoom), NULL);
+    save_button = GTK_BUTTON(gtk_builder_get_object(builder, "save_button"));
+    g_signal_connect(G_OBJECT(save_button), "pressed", 
+                    G_CALLBACK(save), NULL);
+    save_as_button = GTK_BUTTON(gtk_builder_get_object(builder, "save_as_button"));
+    g_signal_connect(G_OBJECT(save_as_button), "pressed", 
+                    G_CALLBACK(save_as), NULL);
+    // TODO: add action to the buttons
+    open_button = GTK_BUTTON(gtk_builder_get_object(builder, "open_button"));
+    shortcuts_button = GTK_BUTTON(gtk_builder_get_object(builder, "shortcuts_button"));
+    about_button = GTK_BUTTON(gtk_builder_get_object(builder, "about_button"));
     // start
     gtk_widget_show(window);                
-    scale = get_sane_scale();
+    set_title_saved(FALSE);
 
+    update_drawing_area();
+    scale = get_sane_scale();
     return 0;
 }
 
@@ -718,6 +820,7 @@ int main(int argc, char *argv[])
 
     // TODO: show something when it's started without a file as arg or stdin
     load(image_to_edit);
+
 
     gtk_init(&argc, &argv);
 

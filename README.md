@@ -25,8 +25,10 @@ First you select your screenshot through maim like you are used to. The result g
 |holding left mouse button|painting|
 |holding right mouse button|erasing|
 |holding the middle mouse button, h, j, k, l|moving the image|
-|mouse scrolling, u, i|scaling the image|
+|mouse scrolling, +, -|scaling the image|
 |x|undo all changes|
+|u|undo|
+|r|redo|
 |s|save the image|
 |w|quit without saving|
 |q|quit and save the image|
@@ -38,10 +40,11 @@ First you select your screenshot through maim like you are used to. The result g
 ## TODO
 - [x] make the second command line argument do its job
 - [x] fix image dragging by holding the middle mouse button
-- [ ] make the popup better looking
+- [x] make the popup better looking
 - [x] add clipboard support
 - [x] interpolate between two drawn dots to create a more smooth line
 - [x] eraser
 - [x] text tool
+One TODO list done 🥳
 
 my first C project - don't be harsh
