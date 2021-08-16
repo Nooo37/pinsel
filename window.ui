@@ -259,7 +259,7 @@
             <property name="visible">True</property>
             <property name="can-focus">True</property>
             <property name="receives-default">True</property>
-            <property name="text" translatable="yes">About nanoanno</property>
+            <property name="text" translatable="yes">About pinsel</property>
           </object>
           <packing>
             <property name="expand">False</property>
@@ -282,7 +282,7 @@
   </object>
   <object class="GtkApplicationWindow" id="window1">
     <property name="can-focus">False</property>
-    <property name="role">nanoanno</property>
+    <property name="role">pinsel</property>
     <property name="window-position">center</property>
     <property name="default-width">1000</property>
     <property name="default-height">700</property>

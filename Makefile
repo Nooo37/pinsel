@@ -1,21 +1,21 @@
-.DEFAULT_GOAL := nanoanno
+.DEFAULT_GOAL := pinsel
 CC := gcc
 CFILES   := $(wildcard *.c)
 OBJFILES := $(CFILES:.c=.o)
 LDLIBS := $(shell pkg-config --cflags --libs gtk+-3.0)
 
 
-nanoanno: $(OBJFILES)
+pinsel: $(OBJFILES)
 	$(CC) -o $@ $^ -Wall $(LDLIBS) -export-dynamic
 
 %.o: %.c
 	$(CC) $< -c -Wall $(LDLIBS)
 
 .PHONY: install
-install: nanoanno
-	cp nanoanno /usr/local/bin/nanoanno
-	mkdir -p /usr/local/lib/nanoanno/
-	cp window.ui /usr/local/lib/nanoanno/window.ui
+install: pinsel
+	cp pinsel /usr/local/bin/pinsel
+	mkdir -p /usr/local/lib/pinsel/
+	cp window.ui /usr/local/lib/pinsel/window.ui
 
 .PHONY: clean
 clean:

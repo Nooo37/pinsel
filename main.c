@@ -4,10 +4,10 @@
 #include "draw.h"
 #include "history.h"
 
-#define TEMP_OUT_FILE "/tmp/nanoanno_output.png"
-#define TEMP_IN_FILE "/tmp/nanoanno_input.png"
+#define TEMP_OUT_FILE "/tmp/pinsel_output.png"
+#define TEMP_IN_FILE "/tmp/pinsel_input.png"
 #define UI_FILE "window.ui"
-/* #define UI_FILE "/usr/local/lib/nanoanno/window.ui" */
+/* #define UI_FILE "/usr/local/lib/pinsel/window.ui" */
 #define SANE_SCALE_MARGIN 0.03
 #define DELTA_MOVE 20
 #define DELTA_ZOOM 0.04
