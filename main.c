@@ -312,14 +312,31 @@ static void decrease_radius()
 static gint button_press_event( GtkWidget      *widget,
                                 GdkEventButton *event )
 {
-    int x, y;
+    int x, y, x_translated, y_translated;
+
+    // get coords
+    x = event->x;
+    y = event->y;
+    x_translated = (x - offset_x - mid_x) / scale;
+    y_translated = (y - offset_y - mid_y) / scale;
+
+    if (mode == BRUSHING) {
+        coord_t* temp = g_new(coord_t, 1);
+        temp->x = x_translated;
+        temp->y = y_translated;
+        coords = g_list_append(coords, temp);
+        g_clear_object(&before_action);
+        before_action = gdk_pixbuf_copy(pix);
+        g_clear_object(&pix);
+        pix = draw_line(before_action, coords, &color1, radius);
+        change();
+        g_list_free_full(coords, g_free);
+        coords = NULL;
+    }
 
     if (mode == TEXT) {
-        // get coords
-        x = event->x;
-        y = event->y;
-        text_x = (x - offset_x - mid_x) / scale;
-        text_y = (y - offset_y - mid_y) / scale;
+        text_x = x_translated;
+        text_y = y_translated;
 
         if (activity == TEXTING) {
             temporary_text_display();
