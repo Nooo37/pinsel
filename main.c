@@ -698,7 +698,7 @@ gboolean my_key_press(GtkWidget *widget,
         undo();
     if (event->keyval == 'r' || 
                     (event->state & GDK_CONTROL_MASK && event->keyval == 'Z') ||
-                    (event->state & GDK_CONTROL_MASK && event->keyval == 'r'))
+                    (event->state & GDK_CONTROL_MASK && event->keyval == 'y'))
         redo();
     // movement, zoom
     if (event->keyval == '+')
