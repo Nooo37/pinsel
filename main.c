@@ -737,8 +737,7 @@ int build_ui()
     device = gdk_seat_get_pointer(seat);
 
     // building and getting all the widgets, connecting signals
-    builder = gtk_builder_new();
-    gtk_builder_add_from_file (builder, UI_FILE, NULL);
+    builder = gtk_builder_new_from_resource("/ui/window.ui");
 
     // main window and its callbacks
     window = GTK_WIDGET(gtk_builder_get_object(builder, "window1"));
@@ -903,6 +902,9 @@ int main(int argc, char *argv[])
     } 
 
     // TODO: show something when it's started without a file as arg or stdin
+    if (image_to_edit == NULL)
+        return 1;
+
     load(image_to_edit);
 
 
