@@ -11,6 +11,7 @@
 #define SANE_SCALE_MARGIN 0.03
 #define DELTA_MOVE 20
 #define DELTA_ZOOM 0.04
+#define DELTA_RADIUS 2
 #define BUF_SIZE 1024
 
 typedef enum {
@@ -43,6 +44,7 @@ GtkDialog *text_dialog;
 GtkToggleButton *brush_toggle;
 GtkToggleButton *eraser_toggle;
 GtkToggleButton *text_toggle;
+GtkAdjustment *radius_scale;
 
 // pixbufs
 GdkPixbuf *pix;
@@ -296,6 +298,17 @@ static gboolean decrease_offset_y()
     return FALSE;
 }
 
+static void increase_radius()
+{
+    gtk_adjustment_set_value(radius_scale, radius + DELTA_RADIUS);
+}
+
+static void decrease_radius()
+{
+    gtk_adjustment_set_value(radius_scale, radius - DELTA_RADIUS);
+}
+
+
 static gint button_press_event( GtkWidget      *widget,
                                 GdkEventButton *event )
 {
@@ -324,9 +337,13 @@ static gboolean mouse_scroll( GtkWidget *widget,
                               GdkEventScroll *event,
                               gpointer data) 
 {
-    if (event->direction == GDK_SCROLL_UP)
+    if (event->direction == GDK_SCROLL_UP && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
+        increase_radius();
+    else if (event->direction == GDK_SCROLL_DOWN && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
+        decrease_radius();
+    else if (event->direction == GDK_SCROLL_UP)
         increase_scale();
-    if (event->direction == GDK_SCROLL_DOWN)
+    else if (event->direction == GDK_SCROLL_DOWN)
         decrease_scale();
     return TRUE;
 }
@@ -496,6 +513,7 @@ static void on_font_set(GtkFontButton* button, gpointer user_data)
     temporary_text_display();
 }
 
+
 // connect to that to get the slider to do its job
 static void change_radius(GtkAdjustment *adjust)
 {
@@ -615,11 +633,11 @@ gboolean my_key_press(GtkWidget *widget,
     if (event->keyval == 'x')
         undo_all_changes();
     if (event->keyval == 'u' || 
-                    event->state & GDK_CONTROL_MASK && event->keyval == 'z')
+                    (event->state & GDK_CONTROL_MASK && event->keyval == 'z'))
         undo();
     if (event->keyval == 'r' || 
-                    event->state & GDK_CONTROL_MASK && event->keyval == 'Z' ||
-                    event->state & GDK_CONTROL_MASK && event->keyval == 'r')
+                    (event->state & GDK_CONTROL_MASK && event->keyval == 'Z') ||
+                    (event->state & GDK_CONTROL_MASK && event->keyval == 'r'))
         redo();
     // movement, zoom
     if (event->keyval == '+')
@@ -650,7 +668,6 @@ int build_ui()
     GtkColorChooser *color_picker_primary;
     GtkColorChooser *color_picker_secondary;
     GtkTextBuffer *textbuffer;
-    GtkAdjustment *radius_scale;
     GtkFontButton *font_button;
 
     // init devices (for mouse position and clipboard)
