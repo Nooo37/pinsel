@@ -22,6 +22,7 @@ typedef enum {
 
 typedef enum {
     BRUSHING,
+    LINING,
     ERASING,
     TEXTING,
     DRAGGING,
@@ -67,6 +68,7 @@ GdkRGBA color1; // primary color
 GdkRGBA color2; // secondary color
 int radius = 10;
 GList *coords = NULL;
+coord_t *start_line = NULL;
 
 // mouse dragging
 int dragstart_x = 0;
@@ -158,6 +160,46 @@ static gint motion_notify_event( GtkWidget *widget,
 
     x_translated = (x - offset_x - mid_x) / scale;
     y_translated = (y - offset_y - mid_y) / scale;
+
+    // do a line when holding shift and moving the mouse in brush mode
+    if ((state & GDK_BUTTON1_MASK) && (state & GDK_SHIFT_MASK) && mode == BRUSH) {
+        if (activity == LINING) {
+            coord_t* temp = g_new(coord_t, 1);
+            temp->x = x_translated;
+            temp->y = y_translated;
+            coords = g_list_append(coords, start_line);
+            coords = g_list_append(coords, temp);
+            pix = draw_line(before_action, coords, &color1, radius);
+            update_drawing_area();
+            g_free(temp);
+            g_list_free(coords);
+            coords = NULL;
+        } else {
+            activity = LINING;
+            start_line = g_new(coord_t, 1);
+            start_line->x = x_translated;
+            start_line->y = y_translated;
+            g_clear_object(&before_action);
+            before_action = gdk_pixbuf_copy(pix);
+        }
+        return TRUE;
+    } else {
+        if (activity == LINING) {
+            coord_t* temp = g_new(coord_t, 1);
+            temp->x = x_translated;
+            temp->y = y_translated;
+            coords = g_list_append(coords, start_line);
+            coords = g_list_append(coords, temp);
+            pix = draw_line(before_action, coords, &color1, radius);
+            g_free(temp);
+            g_list_free(coords);
+            g_free(start_line);
+            coords = NULL;
+            change();
+            activity = IDLE;
+            return TRUE;
+        }
+    }
 
     // strokes drawing
     if ((state & GDK_BUTTON1_MASK && mode == BRUSH) ||
@@ -320,20 +362,6 @@ static gint button_press_event( GtkWidget      *widget,
     x_translated = (x - offset_x - mid_x) / scale;
     y_translated = (y - offset_y - mid_y) / scale;
 
-    if (mode == BRUSHING) {
-        coord_t* temp = g_new(coord_t, 1);
-        temp->x = x_translated;
-        temp->y = y_translated;
-        coords = g_list_append(coords, temp);
-        g_clear_object(&before_action);
-        before_action = gdk_pixbuf_copy(pix);
-        g_clear_object(&pix);
-        pix = draw_line(before_action, coords, &color1, radius);
-        change();
-        g_list_free_full(coords, g_free);
-        coords = NULL;
-    }
-
     if (mode == TEXT) {
         text_x = x_translated;
         text_y = y_translated;
@@ -342,10 +370,25 @@ static gint button_press_event( GtkWidget      *widget,
             temporary_text_display();
         } else {
             activity = TEXTING;
+            g_clear_object(&before_action);
             before_action = gdk_pixbuf_copy(pix);
             gtk_widget_show((GtkWidget*) text_dialog);
         }
-    }
+    } // else if (mode == BRUSHING) {
+      // TODO: draw dot on click in brush mode
+    /*     coord_t* temp = g_new(coord_t, 1); */
+    /*     temp->x = x_translated; */
+    /*     temp->y = y_translated; */
+    /*     coords = g_list_append(coords, temp); */
+    /*     g_clear_object(&before_action); */
+    /*     before_action = gdk_pixbuf_copy(pix); */
+    /*     g_clear_object(&pix); */
+    /*     pix = draw_line(before_action, coords, &color1, radius); */
+    /*     change(); */
+    /*     g_list_free_full(coords, g_free); */
+    /*     coords = NULL; */
+    /* } */
+
     return TRUE;
 }
 
@@ -430,6 +473,7 @@ static void quit_text_tool_ok()
 {
     quit_text();
     before_action = pix;
+    pix = draw_text(before_action, text, &color1, font, font_size, text_x, text_y);
     change();
 }
 

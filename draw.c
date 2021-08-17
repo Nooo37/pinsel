@@ -81,6 +81,7 @@ GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
                      int x, 
                      int y)
 {
+    GdkPixbuf *result;
     cairo_surface_t *surface;
     cairo_t *cr;
     int img_width, img_height;
@@ -102,9 +103,12 @@ GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
     cairo_set_source_rgba(cr, color->red, color->green, color->blue, color->alpha);
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, text);  
-    cairo_destroy(cr);
 
-    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+    result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+
+    return result;
 }
 
 extern GdkPixbuf* merge_pixbufs(GdkPixbuf *top_one,
