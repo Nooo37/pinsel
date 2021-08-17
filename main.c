@@ -6,8 +6,8 @@
 
 #define TEMP_OUT_FILE "/tmp/pinsel_output.png"
 #define TEMP_IN_FILE "/tmp/pinsel_input.png"
-#define UI_FILE "window.ui"
-/* #define UI_FILE "/usr/local/lib/pinsel/window.ui" */
+/* #define UI_FILE "window.ui" */
+#define UI_FILE "/usr/local/lib/pinsel/window.ui"
 #define SANE_SCALE_MARGIN 0.03
 #define DELTA_MOVE 20
 #define DELTA_ZOOM 0.04
@@ -90,14 +90,12 @@ static gboolean update_drawing_area()
 
     // initalize stuff
     /* cr = gdk_cairo_create(gtk_widget_get_window(canvas)); */
-    cairo_region_t * cairoRegion = cairo_region_create();
-    GdkDrawingContext * drawingContext;
+    cairo_region_t* cairoRegion = cairo_region_create();
     GdkWindow* window = gtk_widget_get_window(canvas);
-    drawingContext = gdk_window_begin_draw_frame (window,cairoRegion);
+    GdkDrawingContext* drawingContext = gdk_window_begin_draw_frame (window,cairoRegion);
     cairo_t* cr = gdk_drawing_context_get_cairo_context (drawingContext);
 
     // "clear" background
-    cairo_set_source_rgba(cr, 0, 0, 0, 0);
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
     cairo_paint(cr);
 
@@ -167,17 +165,19 @@ static gint motion_notify_event( GtkWidget *widget,
             temp->x = x_translated;
             temp->y = y_translated;
             coords = g_list_append(coords, temp);
+            g_clear_object(&pix);
             pix = draw_line(before_action, coords, &color1, radius);
             update_drawing_area();
         } else {
             activity = BRUSHING;
-            before_action = pix;
+            g_clear_object(&before_action);
+            before_action = gdk_pixbuf_copy(pix);
             update_drawing_area();
         }
     } else {
         if (activity == BRUSHING) {
             pix = draw_line(before_action, coords, &color1, radius);
-            g_list_free(coords);
+            g_list_free_full(coords, g_free);
             coords = NULL;
             change();
             activity = IDLE;
@@ -192,17 +192,19 @@ static gint motion_notify_event( GtkWidget *widget,
             temp->x = x_translated;
             temp->y = y_translated;
             coords = g_list_append(coords, temp);
+            g_clear_object(&pix);
             pix = erase_under_line(old, before_action, coords, radius, 1.0);
             update_drawing_area();
         } else {
             activity = ERASING;
-            before_action = pix;
+            g_clear_object(&before_action);
+            before_action = gdk_pixbuf_copy(pix);
             update_drawing_area();
         }
     } else {
         if (activity == ERASING) {
             pix = erase_under_line(old, before_action, coords, radius, 1.0);
-            g_list_free(coords);
+            g_list_free_full(coords, g_free);
             coords = NULL;
             change();
             activity = IDLE;
@@ -232,6 +234,7 @@ static gint motion_notify_event( GtkWidget *widget,
 
 void temporary_text_display()
 {
+    g_clear_object(&pix);
     pix = draw_text(before_action, text, &color1, font, font_size, text_x, text_y);
     update_drawing_area();
 }
@@ -309,7 +312,7 @@ static gint button_press_event( GtkWidget      *widget,
             temporary_text_display();
         } else {
             activity = TEXTING;
-            before_action = pix;
+            before_action = gdk_pixbuf_copy(pix);
             gtk_widget_show((GtkWidget*) text_dialog);
         }
     }

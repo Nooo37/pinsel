@@ -36,8 +36,10 @@ cairo_surface_t* strokes_to_surface(GList *positions,
         cairo_line_to(cr, value->x, value->y);
         listrunner = g_list_next(listrunner);
     }
+    g_list_free(listrunner);
 
     cairo_stroke(cr);
+    cairo_destroy(cr);
 
     return surface;
 }
@@ -47,6 +49,7 @@ GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on,
                      GdkRGBA *color, 
                      int width)
 {
+    GdkPixbuf *result;
     cairo_surface_t *surface, *strokes;
     cairo_t *cr;
     int img_height, img_width;
@@ -62,7 +65,12 @@ GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on,
     cairo_set_source_surface(cr, strokes, 0, 0);
     cairo_paint(cr);
 
-    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+    result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+    cairo_surface_destroy(strokes);
+
+    return result;
 }
 
 GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on, 
@@ -94,6 +102,7 @@ GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
     cairo_set_source_rgba(cr, color->red, color->green, color->blue, color->alpha);
     cairo_move_to(cr, x, y);
     cairo_show_text(cr, text);  
+    cairo_destroy(cr);
 
     return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 }
