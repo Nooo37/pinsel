@@ -1,7 +1,5 @@
 #include <gtk/gtk.h>
 
-#define HISTORY_LIMIT 10
-
 /*
  * Initalizes the history
  *
