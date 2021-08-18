@@ -408,6 +408,16 @@ static gboolean mouse_scroll( GtkWidget *widget,
     return TRUE;
 }
 
+static void redraw_popup(GtkWidget *temp, gpointer popup)
+{
+    gtk_widget_queue_draw(GTK_WIDGET(popup));
+}
+
+static void fullscreen(GtkWidget *temp, gpointer window)
+{
+    gtk_window_fullscreen(GTK_WINDOW(window));
+}
+
 // undo all changes
 static void undo_all_changes() 
 {
@@ -441,12 +451,16 @@ static void flip_vertically()
 static void rotate_left()
 {
     pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+    img_width = gdk_pixbuf_get_width(pix);
+    img_height = gdk_pixbuf_get_height(pix);
     change();
 }
 
 static void rotate_right()
 {
     pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_CLOCKWISE);
+    img_width = gdk_pixbuf_get_width(pix);
+    img_height = gdk_pixbuf_get_height(pix);
     change();
 }
 
@@ -592,23 +606,24 @@ float get_sane_scale()
 }
 
 // writes the stdin stream into a png file to process it further
-void write_stdin_to_file()
+int write_stdin_to_file()
 {
     void *content = malloc(BUF_SIZE);
 
     FILE *fp = fopen(TEMP_IN_FILE, "w");
 
     if (fp == 0)
-        printf("Error: Couldn't open the temp file\n");
+        return 1;
 
     int read;
     while ((read = fread(content, 1, BUF_SIZE, stdin))) {
         fwrite(content, read, 1, fp);
     }
     if (ferror(stdin))
-        printf("Error: Couldn't read from stdin\n");
+        return 2;
 
     fclose(fp);
+    return 0;
 }
 
 void undo()
@@ -700,6 +715,8 @@ gboolean my_key_press(GtkWidget *widget,
                     (event->state & GDK_CONTROL_MASK && event->keyval == 'Z') ||
                     (event->state & GDK_CONTROL_MASK && event->keyval == 'y'))
         redo();
+    if (event->keyval == GDK_KEY_Escape)
+        gtk_window_unfullscreen(GTK_WINDOW(window));
     // movement, zoom
     if (event->keyval == '+')
         increase_scale();
@@ -720,7 +737,7 @@ gboolean my_key_press(GtkWidget *widget,
 int build_ui()
 {
     GtkBuilder *builder; 
-    GtkButton *undo_button, *redo_button, 
+    GtkButton *undo_button, *redo_button, *fullscreen_button,
               *rotate_left_button, *rotate_right_button, 
               *flip_horizontally_button, *flip_vertically_button,
               *undo_all_button, *fit_zoom_button, *about_button,
@@ -730,6 +747,7 @@ int build_ui()
     GtkColorChooser *color_picker_secondary;
     GtkTextBuffer *textbuffer;
     GtkFontButton *font_button;
+    GtkWidget *popover;
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
@@ -832,30 +850,46 @@ int build_ui()
                     G_CALLBACK(change_radius), NULL);
 
     // everything in the popover
+    popover = GTK_WIDGET(gtk_builder_get_object(builder, "popover1"));
     rotate_left_button = GTK_BUTTON(gtk_builder_get_object(builder, "rotate_left_button"));
     g_signal_connect(G_OBJECT(rotate_left_button), "pressed", 
                     G_CALLBACK(rotate_left), NULL);
+    g_signal_connect(G_OBJECT(rotate_left_button), "pressed", 
+                    G_CALLBACK(redraw_popup), (gpointer) popover);
     rotate_right_button = GTK_BUTTON(gtk_builder_get_object(builder, "rotate_right_button"));
     g_signal_connect(G_OBJECT(rotate_right_button), "pressed", 
                     G_CALLBACK(rotate_right), NULL);
+    g_signal_connect(G_OBJECT(rotate_right_button), "pressed", 
+                    G_CALLBACK(redraw_popup), (gpointer) popover);
     flip_horizontally_button = GTK_BUTTON(gtk_builder_get_object(builder, "flip_horizontally_button"));
     g_signal_connect(G_OBJECT(flip_horizontally_button), "pressed", 
                     G_CALLBACK(flip_horizontally), NULL);
+    g_signal_connect(G_OBJECT(flip_horizontally_button), "pressed", 
+                    G_CALLBACK(redraw_popup), (gpointer) popover);
     flip_vertically_button = GTK_BUTTON(gtk_builder_get_object(builder, "flip_vertically_button"));
     g_signal_connect(G_OBJECT(flip_vertically_button), "pressed", 
                     G_CALLBACK(flip_vertically), NULL);
+    g_signal_connect(G_OBJECT(flip_vertically_button), "pressed", 
+                    G_CALLBACK(redraw_popup), (gpointer) popover);
     undo_all_button = GTK_BUTTON(gtk_builder_get_object(builder, "undo_all_button"));
     g_signal_connect(G_OBJECT(undo_all_button), "pressed", 
                     G_CALLBACK(undo_all_changes), NULL);
+    g_signal_connect(G_OBJECT(undo_all_button), "pressed", 
+                    G_CALLBACK(redraw_popup), (gpointer) popover);
     fit_zoom_button = GTK_BUTTON(gtk_builder_get_object(builder, "fit_zoom_button"));
     g_signal_connect(G_OBJECT(fit_zoom_button), "pressed", 
                     G_CALLBACK(fit_zoom), NULL);
+    g_signal_connect(G_OBJECT(fit_zoom_button), "pressed", 
+                    G_CALLBACK(redraw_popup), (gpointer) popover);
     save_button = GTK_BUTTON(gtk_builder_get_object(builder, "save_button"));
     g_signal_connect(G_OBJECT(save_button), "pressed", 
                     G_CALLBACK(save), NULL);
     save_as_button = GTK_BUTTON(gtk_builder_get_object(builder, "save_as_button"));
     g_signal_connect(G_OBJECT(save_as_button), "pressed", 
                     G_CALLBACK(save_as), NULL);
+    fullscreen_button = GTK_BUTTON(gtk_builder_get_object(builder, "fullscreen_button"));
+    g_signal_connect(G_OBJECT(fullscreen_button), "pressed", 
+                    G_CALLBACK(fullscreen), (gpointer) window);
     // TODO: add action to the buttons
     open_button = GTK_BUTTON(gtk_builder_get_object(builder, "open_button"));
     shortcuts_button = GTK_BUTTON(gtk_builder_get_object(builder, "shortcuts_button"));
@@ -892,28 +926,37 @@ int main(int argc, char *argv[])
 
     // initalize the image
 
-    if (argc > 1) { // is the image a command line argument?
+    if (argc > 1) // is the image a command line argument?
         image_to_edit = argv[1];
-    }
 
     if (isatty(0) != 1) { // 0 refers to stdin, is the image coming in a pipe?
-        write_stdin_to_file();
+        if (write_stdin_to_file()) {
+            printf("Failed to write stdin to a temporary file\n");
+            return 1;
+        }
         image_to_edit = TEMP_IN_FILE;
     } 
 
     // TODO: show something when it's started without a file as arg or stdin
-    if (image_to_edit == NULL)
+    if (image_to_edit == NULL) {
+        printf("Please provide a image to edit through the first argument or through stdin\n");
         return 1;
+    }
 
-    load(image_to_edit);
-
+    if (load(image_to_edit)) {
+        printf("Failed to load the provided image '%s'\n", image_to_edit);
+        return 1;
+    }
 
     gtk_init(&argc, &argv);
 
-    int t = build_ui();
+    if (build_ui()) {
+        printf("Failed to build the UI\n");
+        return 1;
+    }
 
     gtk_main();
 
-    return 0 | t;
+    return 0;
 }
 
