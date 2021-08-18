@@ -19,6 +19,10 @@ $(RESFILE): ui.gresource.xml window.ui
 install: pinsel
 	cp pinsel /usr/local/bin/pinsel
 
+.PHONY: uninstall
+uninstall:
+	rm /usr/local/bin/pinsel
+
 .PHONY: clean
 clean:
 	rm -f $(OBJFILES) $(.DEFAULT_GOAL) $(RESFILE)

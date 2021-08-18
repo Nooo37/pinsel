@@ -2,17 +2,9 @@
 #include <libgen.h>
 #include <gtk/gtk.h>
 #include "draw.h"
+#include "utils.h"
 #include "history.h"
-
-#define TEMP_OUT_FILE "/tmp/pinsel_output.png"
-#define TEMP_IN_FILE "/tmp/pinsel_input.png"
-/* #define UI_FILE "window.ui" */
-#define UI_FILE "/usr/local/lib/pinsel/window.ui"
-#define SANE_SCALE_MARGIN 0.03
-#define DELTA_MOVE 20
-#define DELTA_ZOOM 0.04
-#define DELTA_RADIUS 2
-#define BUF_SIZE 1024
+#include "config.h"
 
 typedef enum {
     BRUSH,
@@ -392,22 +384,6 @@ static gint button_press_event( GtkWidget      *widget,
     return TRUE;
 }
 
-// connect to that to get scale on mouse scrolling
-static gboolean mouse_scroll( GtkWidget *widget,
-                              GdkEventScroll *event,
-                              gpointer data) 
-{
-    if (event->direction == GDK_SCROLL_UP && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
-        increase_radius();
-    else if (event->direction == GDK_SCROLL_DOWN && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
-        decrease_radius();
-    else if (event->direction == GDK_SCROLL_UP)
-        increase_scale();
-    else if (event->direction == GDK_SCROLL_DOWN)
-        decrease_scale();
-    return TRUE;
-}
-
 static void redraw_popup(GtkWidget *temp, gpointer popup)
 {
     gtk_widget_queue_draw(GTK_WIDGET(popup));
@@ -422,6 +398,8 @@ static void fullscreen(GtkWidget *temp, gpointer window)
 static void undo_all_changes() 
 {
     pix = history_undo_all();
+    img_width = gdk_pixbuf_get_width(pix);
+    img_height = gdk_pixbuf_get_height(pix);
     set_title_saved(FALSE);
     offset_x = 0;
     offset_y = 0;
@@ -433,6 +411,7 @@ static void fit_zoom()
     offset_x = 0;
     offset_y = 0;
     // TOOD: set scale to get_sane_scale
+    scale = get_sane_scale(img_width, img_height, area_width, area_height);
     update_drawing_area();
 }
 
@@ -595,37 +574,6 @@ static void change_radius(GtkAdjustment *adjust)
     radius = gtk_adjustment_get_value(adjust);
 }
 
-
-// get sane scaling default based on the image size at app launch
-float get_sane_scale() 
-{
-    if ((img_width / img_height) > (area_width / area_height))
-        return (area_width / (float) img_width) * (1 - SANE_SCALE_MARGIN);
-    else
-        return (area_height / (float) img_height) * (1 - SANE_SCALE_MARGIN);
-}
-
-// writes the stdin stream into a png file to process it further
-int write_stdin_to_file()
-{
-    void *content = malloc(BUF_SIZE);
-
-    FILE *fp = fopen(TEMP_IN_FILE, "w");
-
-    if (fp == 0)
-        return 1;
-
-    int read;
-    while ((read = fread(content, 1, BUF_SIZE, stdin))) {
-        fwrite(content, read, 1, fp);
-    }
-    if (ferror(stdin))
-        return 2;
-
-    fclose(fp);
-    return 0;
-}
-
 void undo()
 {
     pix = history_undo_one();
@@ -640,38 +588,11 @@ void redo()
     update_drawing_area();
 }
 
-// everything that needs to happen for cleanly quitting the app
-void quit()
+void save_image()
 {
-    // the current image to stdout
-    if (isatty(1) != 1) { // the first 1 refers to stdout
-        remove(TEMP_OUT_FILE);
-        gdk_pixbuf_save(pix, TEMP_OUT_FILE, "png", NULL, NULL);
-        FILE *a = fopen(TEMP_OUT_FILE, "r");
-        int n;
-        char s[65536];
-        while ((n = fread(s, 1, sizeof(s), a))) {
-            fwrite(s, 1, n, stdout);
-        }
-    }
-    // quit gtk
-    gtk_main_quit();
-}
-
-void save_as()
-{
-    // TODO: do
-}
-
-// saves the image
-void save()
-{
-    if (dest == NULL) {
-        save_as();
-    } else {
-        gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
-        set_title_saved(TRUE);
-    }
+    // TODO: error handling
+    gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
+    set_title_saved(TRUE);
 }
 
 // loads the image into the application
@@ -693,18 +614,93 @@ int load(char* filename)
     return 0;
 }
 
+void save_as()
+{
+    GtkWidget *dialog;
+     
+    dialog = gtk_file_chooser_dialog_new ("Save File",
+                                          GTK_WINDOW(window),
+                                          GTK_FILE_CHOOSER_ACTION_SAVE,
+                                          "gtk-cancel", GTK_RESPONSE_CANCEL,
+                                          "gtk-save", GTK_RESPONSE_ACCEPT,
+                                          NULL);
+    gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);
+    
+    if (dest != NULL)
+        gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(dialog), dest);
+    
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        dest = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        save_image();
+    }
+    
+    gtk_widget_destroy (dialog);
+}
+
+// saves the image
+void save()
+{
+    if (dest == NULL)
+        save_as();
+    else
+        save_image();
+}
+
+
+void open_new_image(GtkWidget *temp, GtkWidget *popover)
+{
+    GtkWidget *dialog;
+     
+    dialog = gtk_file_chooser_dialog_new ("Open File",
+                                          GTK_WINDOW(window),
+                                          GTK_FILE_CHOOSER_ACTION_OPEN,
+                                          "gtk-cancel", GTK_RESPONSE_CANCEL,
+                                          "gtk-save", GTK_RESPONSE_ACCEPT,
+                                          NULL);
+    gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);
+    
+    if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
+        char* filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        dest = filename;
+        load(dest);
+        update_drawing_area();
+        redraw_popup(NULL, popover);
+        g_free(filename);
+    }
+    
+    gtk_widget_destroy (dialog);
+}
+
+
+// connect to that to get scale on mouse scrolling
+static gboolean mouse_scroll( GtkWidget *widget,
+                              GdkEventScroll *event,
+                              gpointer data) 
+{
+    if (event->direction == GDK_SCROLL_UP && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
+        increase_radius();
+    else if (event->direction == GDK_SCROLL_DOWN && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
+        decrease_radius();
+    else if (event->direction == GDK_SCROLL_UP)
+        increase_scale();
+    else if (event->direction == GDK_SCROLL_DOWN)
+        decrease_scale();
+    return TRUE;
+}
+
+
 // global keybinds
-gboolean my_key_press(GtkWidget *widget,
-                      GdkEventKey *event,
-                      gpointer user_data) 
+static gboolean my_key_press(GtkWidget *widget,
+                             GdkEventKey *event,
+                             gpointer user_data) 
 {
     if (event->keyval == 'w')
-        quit();
+        gtk_main_quit();
     if (event->keyval == 's')
         save();
     if (event->keyval == 'q') {
         save();
-        quit();
+        gtk_main_quit();
     }
     if (event->keyval == 'x')
         undo_all_changes();
@@ -761,7 +757,7 @@ int build_ui()
     window = GTK_WIDGET(gtk_builder_get_object(builder, "window1"));
     gtk_builder_connect_signals(builder, NULL);
     g_signal_connect(G_OBJECT(window), "destroy", 
-                    G_CALLBACK(quit), NULL);
+                    G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(G_OBJECT(window), "key-press-event", 
                     G_CALLBACK(my_key_press), NULL);
 
@@ -892,6 +888,8 @@ int build_ui()
                     G_CALLBACK(fullscreen), (gpointer) window);
     // TODO: add action to the buttons
     open_button = GTK_BUTTON(gtk_builder_get_object(builder, "open_button"));
+    g_signal_connect(G_OBJECT(open_button), "pressed", 
+                    G_CALLBACK(open_new_image), (gpointer) popover);
     shortcuts_button = GTK_BUTTON(gtk_builder_get_object(builder, "shortcuts_button"));
     about_button = GTK_BUTTON(gtk_builder_get_object(builder, "about_button"));
     // start
@@ -899,7 +897,7 @@ int build_ui()
     set_title_saved(FALSE);
 
     update_drawing_area();
-    scale = get_sane_scale();
+    scale = get_sane_scale(img_width, img_height, area_width, area_height);
     return 0;
 }
 
@@ -924,13 +922,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    // initalize the image
-
     if (argc > 1) // is the image a command line argument?
         image_to_edit = argv[1];
 
     if (isatty(0) != 1) { // 0 refers to stdin, is the image coming in a pipe?
-        if (write_stdin_to_file()) {
+        if (!write_stdin_to_file()) {
             printf("Failed to write stdin to a temporary file\n");
             return 1;
         }
@@ -944,8 +940,12 @@ int main(int argc, char *argv[])
     }
 
     load(image_to_edit);
+
     if (!GDK_IS_PIXBUF(pix)) {
-        printf("Failed to load the provided image '%s'\n", image_to_edit);
+        if (isatty(0) != 1)
+            printf("Failed to load the image from stdin\n");
+        else 
+            printf("Failed to load the provided image '%s'\n", image_to_edit);
         return 1;
     }
 
@@ -957,6 +957,13 @@ int main(int argc, char *argv[])
     }
 
     gtk_main();
+
+    if (isatty(1) != 1) { // the first 1 refers to stdout
+        if (!write_pixbuf_to_stdout(pix)) {
+            printf("Failed to write the image to stdout\n");
+            return 1;
+        }
+    }
 
     return 0;
 }
