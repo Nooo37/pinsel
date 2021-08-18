@@ -120,11 +120,16 @@ static void set_title_saved(gboolean is_saved)
     else if (is_saved)
         gtk_window_set_title((GtkWindow*) window, basename(dest));
     else {
-        char *temp = (char*) malloc(100 * sizeof(char));
-        sprintf(temp, "*%s", basename(dest));
+        char *temp = g_strdup_printf("*%s", basename(dest));
         gtk_window_set_title((GtkWindow*) window, temp);
         free(temp);
     }
+}
+
+void reload_pixbuf_sizes()
+{
+    img_width = gdk_pixbuf_get_width(pix);
+    img_height = gdk_pixbuf_get_height(pix);
 }
 
 static void change()
@@ -364,7 +369,7 @@ static gint button_press_event( GtkWidget      *widget,
             activity = TEXTING;
             g_clear_object(&before_action);
             before_action = gdk_pixbuf_copy(pix);
-            gtk_widget_show((GtkWidget*) text_dialog);
+            gtk_widget_show(GTK_WIDGET(text_dialog));
         }
     } // else if (mode == BRUSHING) {
       // TODO: draw dot on click in brush mode
@@ -398,8 +403,7 @@ static void fullscreen(GtkWidget *temp, gpointer window)
 static void undo_all_changes() 
 {
     pix = history_undo_all();
-    img_width = gdk_pixbuf_get_width(pix);
-    img_height = gdk_pixbuf_get_height(pix);
+    reload_pixbuf_sizes();
     set_title_saved(FALSE);
     offset_x = 0;
     offset_y = 0;
@@ -430,16 +434,14 @@ static void flip_vertically()
 static void rotate_left()
 {
     pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
-    img_width = gdk_pixbuf_get_width(pix);
-    img_height = gdk_pixbuf_get_height(pix);
+    reload_pixbuf_sizes();
     change();
 }
 
 static void rotate_right()
 {
     pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_CLOCKWISE);
-    img_width = gdk_pixbuf_get_width(pix);
-    img_height = gdk_pixbuf_get_height(pix);
+    reload_pixbuf_sizes();
     change();
 }
 
@@ -477,21 +479,18 @@ static void quit_text_tool_cancel()
     update_drawing_area();
 }
 
-// update the primary colors button
 static void update_color_primary(GtkButton *button, gpointer user_data)
 {
     GtkColorChooser *chooser = (GtkColorChooser*) user_data;
     gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), &color1);
 }
 
-// update the secondary colors button
 static void update_color_secondary(GtkButton *button, gpointer user_data)
 {
     GtkColorChooser *chooser = (GtkColorChooser*) user_data;
     gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), &color2);
 }
 
-// connect to that to get the color button to do its job
 static void change_color1(GtkColorButton *color_button)
 {
     gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color1);
@@ -595,8 +594,7 @@ void save_image()
     set_title_saved(TRUE);
 }
 
-// loads the image into the application
-int load(char* filename)
+int load_new_image(char* filename)
 {
     GError *err = NULL;
 
@@ -608,8 +606,7 @@ int load(char* filename)
         return 1;
     }
     old = gdk_pixbuf_copy(pix);
-    img_width = gdk_pixbuf_get_width(pix);
-    img_height = gdk_pixbuf_get_height(pix);
+    reload_pixbuf_sizes();
     history_init(old);
     return 0;
 }
@@ -637,7 +634,6 @@ void save_as()
     gtk_widget_destroy (dialog);
 }
 
-// saves the image
 void save()
 {
     if (dest == NULL)
@@ -662,7 +658,7 @@ void open_new_image(GtkWidget *temp, GtkWidget *popover)
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
         char* filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
         dest = filename;
-        load(dest);
+        load_new_image(dest);
         update_drawing_area();
         redraw_popup(NULL, popover);
         g_free(filename);
@@ -671,6 +667,17 @@ void open_new_image(GtkWidget *temp, GtkWidget *popover)
     gtk_widget_destroy (dialog);
 }
 
+static void open_about_dialog(GtkWidget *temp, gpointer about_dialog)
+{
+    if (gtk_dialog_run(GTK_DIALOG(about_dialog)))
+        gtk_widget_hide(GTK_WIDGET(about_dialog));
+}
+
+static void open_shortcuts_dialog(GtkWidget *temp, gpointer shortcuts_dialog)
+{
+    gtk_widget_show(GTK_WIDGET(shortcuts_dialog));
+        /* gtk_widget_hide(GTK_WIDGET(shortcuts_dialog)); */
+}
 
 // connect to that to get scale on mouse scrolling
 static gboolean mouse_scroll( GtkWidget *widget,
@@ -743,7 +750,7 @@ int build_ui()
     GtkColorChooser *color_picker_secondary;
     GtkTextBuffer *textbuffer;
     GtkFontButton *font_button;
-    GtkWidget *popover;
+    GtkWidget *popover, *about_dialog, *shortcuts_dialog;
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
@@ -826,6 +833,8 @@ int build_ui()
 
     // text dialog
     text_dialog = GTK_DIALOG(gtk_builder_get_object(builder, "text_dialog"));
+    g_signal_connect(G_OBJECT(text_dialog), "close", 
+                    G_CALLBACK(quit_text_tool_cancel), NULL);
     gtk_window_set_keep_above((GtkWindow*) text_dialog, TRUE);
     text_dialog_ok = GTK_BUTTON(gtk_builder_get_object(builder, "text_dialog_ok"));
     g_signal_connect(G_OBJECT(text_dialog_ok), "pressed", 
@@ -886,12 +895,17 @@ int build_ui()
     fullscreen_button = GTK_BUTTON(gtk_builder_get_object(builder, "fullscreen_button"));
     g_signal_connect(G_OBJECT(fullscreen_button), "pressed", 
                     G_CALLBACK(fullscreen), (gpointer) window);
-    // TODO: add action to the buttons
     open_button = GTK_BUTTON(gtk_builder_get_object(builder, "open_button"));
     g_signal_connect(G_OBJECT(open_button), "pressed", 
                     G_CALLBACK(open_new_image), (gpointer) popover);
+    shortcuts_dialog = GTK_WIDGET(gtk_builder_get_object(builder, "shortcuts_dialog"));
     shortcuts_button = GTK_BUTTON(gtk_builder_get_object(builder, "shortcuts_button"));
+    g_signal_connect(G_OBJECT(shortcuts_button), "pressed", 
+                    G_CALLBACK(open_shortcuts_dialog), (gpointer) shortcuts_dialog);
+    about_dialog = GTK_WIDGET(gtk_builder_get_object(builder, "about_dialog"));
     about_button = GTK_BUTTON(gtk_builder_get_object(builder, "about_button"));
+    g_signal_connect(G_OBJECT(about_button), "pressed", 
+                    G_CALLBACK(open_about_dialog), (gpointer) about_dialog);
     // start
     gtk_widget_show(window);                
     set_title_saved(FALSE);
@@ -901,16 +915,31 @@ int build_ui()
     return 0;
 }
 
-// main
-int main(int argc, char *argv[])
+static int handle_command_line_args(GApplication *application, 
+                                    GApplicationCommandLine *cmdline)
 {
-    char *image_to_edit = NULL; // path to the image
+    gchar **argv;
+    gint argc;
+    GError *err = NULL;
+    
+    argv = g_application_command_line_get_arguments(cmdline, &argc);
 
+    // load image from stdin if possible
+    if (isatty(0) != 1) {
+        GInputStream *my_stdin = g_application_command_line_get_stdin(cmdline);
+        pix = gdk_pixbuf_new_from_stream(my_stdin, NULL, &err);
+        if (err || !GDK_IS_PIXBUF(pix)) {
+            fprintf(stderr, "Failed to load image from stdin\n%s\n", err->message);
+            return 1;
+        }
+    }
+
+    // handle command line arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
             i++;
             if (i >= argc) {
-                printf("Missing argument for -o\n");
+                fprintf(stderr, "Missing argument for -o\n");
                 return 1;
             } else {
                 dest = argv[i];
@@ -919,46 +948,51 @@ int main(int argc, char *argv[])
             // TODO: help text
             printf("PR a help text please\n");
             return 1;
+        } else if (!GDK_IS_PIXBUF(pix)) { 
+            // only if we don't already have a valid pixbuf at that point
+            err = NULL;
+            pix = gdk_pixbuf_new_from_file(argv[1], &err);
+            if (err) {
+                fprintf(stderr, "Failed to load image from argument\n%s\n", err->message);
+                return 1;
+            }
         }
     }
 
-    if (argc > 1) // is the image a command line argument?
-        image_to_edit = argv[1];
+    if (err != NULL)
+        g_error_free(err);
 
-    if (isatty(0) != 1) { // 0 refers to stdin, is the image coming in a pipe?
-        if (!write_stdin_to_file()) {
-            printf("Failed to write stdin to a temporary file\n");
-            return 1;
-        }
-        image_to_edit = TEMP_IN_FILE;
-    } 
+    return 0;
+}
 
-    // TODO: show something when it's started without a file as arg or stdin
-    if (image_to_edit == NULL) {
-        printf("Please provide a image to edit through the first argument or through stdin\n");
+// main
+int main(int argc, char *argv[])
+{
+    GApplication *app = g_application_new("org.no37.pinsel", 
+                    G_APPLICATION_HANDLES_COMMAND_LINE);
+    g_signal_connect(app, "command-line", 
+                    G_CALLBACK(handle_command_line_args), NULL);
+
+    if (g_application_run(app, argc, argv))
         return 1;
-    }
 
-    load(image_to_edit);
-
-    if (!GDK_IS_PIXBUF(pix)) {
-        if (isatty(0) != 1)
-            printf("Failed to load the image from stdin\n");
-        else 
-            printf("Failed to load the provided image '%s'\n", image_to_edit);
-        return 1;
-    }
+    old = gdk_pixbuf_copy(pix);
+    reload_pixbuf_sizes();
+    history_init(old);
 
     gtk_init(&argc, &argv);
 
-    if (build_ui()) {
-        printf("Failed to build the UI\n");
+    if (build_ui())
         return 1;
-    }
 
     gtk_main();
 
     if (isatty(1) != 1) { // the first 1 refers to stdout
+        GError *err = NULL;
+
+        if (err != NULL)
+            printf("%s\n", err->message);
+   
         if (!write_pixbuf_to_stdout(pix)) {
             printf("Failed to write the image to stdout\n");
             return 1;

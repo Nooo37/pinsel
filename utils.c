@@ -23,23 +23,3 @@ extern gboolean write_pixbuf_to_stdout(GdkPixbuf* pixbuf)
     return TRUE;
 }
 
-extern gboolean write_stdin_to_file()
-{
-    void *content = malloc(BUF_SIZE);
-
-    FILE *fp = fopen(TEMP_IN_FILE, "w");
-
-    if (fp == 0)
-        return FALSE;
-
-    int read;
-    while ((read = fread(content, 1, BUF_SIZE, stdin))) {
-        fwrite(content, read, 1, fp);
-    }
-    if (ferror(stdin))
-        return FALSE;
-
-    fclose(fp);
-    return TRUE;
-}
-
