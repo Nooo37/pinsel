@@ -943,7 +943,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    if (load(image_to_edit)) {
+    load(image_to_edit);
+    if (!GDK_IS_PIXBUF(pix)) {
         printf("Failed to load the provided image '%s'\n", image_to_edit);
         return 1;
     }
