@@ -675,8 +675,15 @@ static void open_about_dialog(GtkWidget *temp, gpointer about_dialog)
 
 static void open_shortcuts_dialog(GtkWidget *temp, gpointer shortcuts_dialog)
 {
-    gtk_widget_show(GTK_WIDGET(shortcuts_dialog));
-        /* gtk_widget_hide(GTK_WIDGET(shortcuts_dialog)); */
+    GtkBuilder *builder;
+    GtkWidget *overlay;
+
+    builder = gtk_builder_new_from_resource("/data/shortcuts.ui");
+    overlay = GTK_WIDGET(gtk_builder_get_object(builder, "shortcuts_dialog"));
+    gtk_window_set_transient_for(GTK_WINDOW(overlay), GTK_WINDOW(window));
+    g_object_set(overlay, "view-name", NULL, NULL);
+    gtk_widget_show(overlay);
+    g_object_unref(builder);
 }
 
 // connect to that to get scale on mouse scrolling
@@ -758,7 +765,7 @@ int build_ui()
     device = gdk_seat_get_pointer(seat);
 
     // building and getting all the widgets, connecting signals
-    builder = gtk_builder_new_from_resource("/ui/window.ui");
+    builder = gtk_builder_new_from_resource("/data/window.ui");
 
     // main window and its callbacks
     window = GTK_WIDGET(gtk_builder_get_object(builder, "window1"));

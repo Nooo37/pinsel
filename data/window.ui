@@ -645,28 +645,4 @@
       </object>
     </child>
   </object>
-  <!-- interface-requires gtk+ 3.19 -->
-  <object class="GtkShortcutsWindow" id="shortcuts_dialog">
-    <property name="modal">1</property>
-    <child>
-      <object class="GtkShortcutsSection">
-        <property name="visible">1</property>
-        <property name="section-name">editor</property>
-        <property name="title" translatable="yes" context="shortcut window">Editor Shortcuts</property>
-        <child>
-          <object class="GtkShortcutsGroup">
-            <property name="visible">1</property>
-            <property name="title" translatable="yes" context="shortcut window">General</property>
-            <child>
-              <object class="GtkShortcutsShortcut">
-                <property name="visible">1</property>
-                <property name="title" translatable="yes" context="shortcut window">This window doesn't survive another opening</property>
-                <property name="accelerator">F</property>
-              </object>
-            </child>
-          </object>
-        </child>
-      </object>
-    </child>
-  </object>
 </interface>

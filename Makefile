@@ -1,27 +1,36 @@
 .DEFAULT_GOAL := pinsel
-CC := gcc
-RESFILE  := resources.c
-CFILES   := $(wildcard *.c) $(RESFILE)
-OBJFILES := $(CFILES:.c=.o)
-LDLIBS := $(shell pkg-config --cflags --libs gtk+-3.0)
+CC            := gcc
+INSTALLDIR    := /usr/local/bin
+DATADIR       := ./data
+SRCDIR        := ./src
+OBJDIR        := ./obj
+UIFILES       := $(wildcard $(DATADIR)/*.ui)
+RESFILE       := $(SRCDIR)/resources.c
+CFILES        := $(wildcard $(SRCDIR)/*.c) $(RESFILE)
+OBJFILES      := $(CFILES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
+LDLIBS        := $(shell pkg-config --cflags --libs gtk+-3.0)
 
+do: 
+	echo "$(CFILES)"
+	echo "$(OBJFILES)"
 
 pinsel: $(OBJFILES)
 	$(CC) -o $@ $^ -Wall $(LDLIBS) -export-dynamic
 
-$(RESFILE): ui.gresource.xml window.ui
-	glib-compile-resources --target=$@ --generate-source $<
+$(RESFILE): $(DATADIR)/data.gresource.xml $(UIFILES)
+	glib-compile-resources --target $@ --generate-source $<
 
-%.o: %.c
-	$(CC) $< -c -Wall $(LDLIBS)
+$(OBJDIR)/%.o: $(SRCDIR)/%.c
+	mkdir -p obj
+	$(CC) $< -c -o $@ -Wall $(LDLIBS)
 
 .PHONY: install
 install: pinsel
-	cp pinsel /usr/local/bin/pinsel
+	cp pinsel $(INSTALLDIR)/pinsel
 
 .PHONY: uninstall
 uninstall:
-	rm /usr/local/bin/pinsel
+	rm $(INSTALLDIR)/pinsel
 
 .PHONY: clean
 clean:
