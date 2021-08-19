@@ -18,6 +18,15 @@ maim -s | pinsel -o $HOME/$(date).png | xclip -selection clipboard -t image/png
 
 First you select your screenshot through maim like you are used to. The result gets piped into pinsel where you can do annoatations and where you are free to save the image to `~/$(date).png` or not. If you don't want to annotate your image then you can still decide on whether to save it or not (which may add one key press in total to that workflow in the "worst case"). The end result gets piped to your clipboard for further usage.
 
+
+## Installation
+
+```shell
+git clone https://github.com/Nooo37/pinsel.git
+cd pinsel
+sudo make install # will put the binary in /usr/local/bin
+```
+
 ## Keybinds
 
 |Keys|Action|

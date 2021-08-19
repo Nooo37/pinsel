@@ -10,9 +10,6 @@ CFILES        := $(wildcard $(SRCDIR)/*.c) $(RESFILE)
 OBJFILES      := $(CFILES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
 LDLIBS        := $(shell pkg-config --cflags --libs gtk+-3.0)
 
-do: 
-	echo "$(CFILES)"
-	echo "$(OBJFILES)"
 
 pinsel: $(OBJFILES)
 	$(CC) -o $@ $^ -Wall $(LDLIBS) -export-dynamic
