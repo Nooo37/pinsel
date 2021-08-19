@@ -23,3 +23,22 @@ extern gboolean write_pixbuf_to_stdout(GdkPixbuf* pixbuf)
     return TRUE;
 }
 
+extern gboolean is_only_control(GdkEventKey* key)
+{
+    return (key->state | GDK_SHIFT_MASK) == (GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+}
+
+extern gboolean is_only_alt(GdkEventKey* key)
+{
+    return (key->state | GDK_SHIFT_MASK) == (GDK_MOD1_MASK | GDK_SHIFT_MASK);
+}
+
+extern gboolean is_only_alt_control(GdkEventKey* key)
+{
+    return (key->state | GDK_SHIFT_MASK) == (GDK_MOD1_MASK | GDK_CONTROL_MASK | GDK_SHIFT_MASK);
+}
+
+extern gboolean is_no_mod(GdkEventKey* key)
+{
+    return (key->state | GDK_SHIFT_MASK) == (GDK_SHIFT_MASK);
+}

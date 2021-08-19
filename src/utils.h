@@ -11,3 +11,14 @@ extern float get_sane_scale(int img_width, int img_height, int area_width, int a
 
 /* Writes the given Pixbuf/Image to stdout (through TEMP_OUT_FILE) */
 extern gboolean write_pixbuf_to_stdout(GdkPixbuf* pixbuf);
+
+extern gboolean is_no_mod(GdkEventKey* key);
+
+extern gboolean is_only_control(GdkEventKey* key);
+
+extern gboolean is_only_alt(GdkEventKey* key);
+
+extern gboolean is_only_alt_control(GdkEventKey* key);
+
+
+

@@ -704,43 +704,50 @@ static gboolean mouse_scroll( GtkWidget *widget,
 
 
 // global keybinds
-static gboolean my_key_press(GtkWidget *widget,
-                             GdkEventKey *event,
-                             gpointer user_data) 
+static void my_key_press(GtkWidget *widget,
+                         GdkEventKey *event,
+                         gpointer user_data) 
 {
-    if (event->keyval == 'w')
+    if ((is_no_mod(event) && event->keyval == 'w') ||
+                    (is_only_control(event) && event->keyval == 'w'))
         gtk_main_quit();
-    if (event->keyval == 's')
+    else if ((is_no_mod(event) && event->keyval == 's') ||
+                    (is_only_control(event) && event->keyval == 's'))
         save();
-    if (event->keyval == 'q') {
+    else if (is_only_control(event) && event->keyval == 'S')
+        save_as();
+    else if ((is_no_mod(event) && event->keyval == 'q') ||
+                    (is_only_control(event) && event->keyval == 'w')) {
         save();
         gtk_main_quit();
     }
-    if (event->keyval == 'x')
+    else if ((is_no_mod(event) && event->keyval == 'x') ||
+                    (is_only_control(event) && event->keyval == 'x'))
         undo_all_changes();
-    if (event->keyval == 'u' || 
-                    (event->state & GDK_CONTROL_MASK && event->keyval == 'z'))
+    else if ((is_no_mod(event) && event->keyval == 'u') || 
+                    (is_only_control(event) && event->keyval == 'z'))
         undo();
-    if (event->keyval == 'r' || 
-                    (event->state & GDK_CONTROL_MASK && event->keyval == 'Z') ||
-                    (event->state & GDK_CONTROL_MASK && event->keyval == 'y'))
+    else if ((is_no_mod(event) && event->keyval == 'r') || 
+                    (is_only_control(event) && event->keyval == 'Z') ||
+                    (is_only_control(event) && event->keyval == 'y'))
         redo();
-    if (event->keyval == GDK_KEY_Escape)
+    else if (is_no_mod(event) && event->keyval == GDK_KEY_Escape)
         gtk_window_unfullscreen(GTK_WINDOW(window));
     // movement, zoom
-    if (event->keyval == '+')
+    else if ((is_no_mod(event) && event->keyval == '+') ||
+                    (is_only_control(event) && event->keyval == '+'))
         increase_scale();
-    if (event->keyval == '-')
+    else if ((is_no_mod(event) && event->keyval == '-') ||
+                    (is_only_control(event) && event->keyval == '-'))
         decrease_scale();
-    if (event->keyval == 'h')
+    else if (is_no_mod(event) && event->keyval == 'h')
         increase_offset_x();
-    if (event->keyval == 'l')
+    else if (is_no_mod(event) && event->keyval == 'l')
         decrease_offset_x();
-    if (event->keyval == 'j')
+    else if (is_no_mod(event) && event->keyval == 'j')
         decrease_offset_y();
-    if (event->keyval == 'k')
+    else if (is_no_mod(event) && event->keyval == 'k')
         increase_offset_y();
-    return FALSE;
 }
 
 // build the gtk ui and connects all signals
