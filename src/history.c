@@ -1,11 +1,11 @@
 #include <gtk/gtk.h>
+
 #include "history.h"
 
-GdkPixbuf *original;
-GdkPixbuf *current;
-GQueue *undo_history;
-GQueue *redo_history;
-
+static GdkPixbuf *original;
+static GdkPixbuf *current;
+static GQueue *undo_history;
+static GQueue *redo_history;
 
 extern void history_init(GdkPixbuf *layer)
 {

@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <gtk/gtk.h>
+#include <gio/gunixoutputstream.h>
+#include <gio/gunixinputstream.h>
+
 #include "draw.h"
 #include "utils.h"
 #include "history.h"
@@ -751,7 +754,7 @@ static void my_key_press(GtkWidget *widget,
 }
 
 // build the gtk ui and connects all signals
-int build_ui()
+int build_ui(gboolean is_on_top, gboolean is_maximized)
 {
     GtkBuilder *builder; 
     GtkButton *undo_button, *redo_button, *fullscreen_button,
@@ -921,6 +924,9 @@ int build_ui()
     g_signal_connect(G_OBJECT(about_button), "pressed", 
                     G_CALLBACK(open_about_dialog), (gpointer) about_dialog);
     // start
+    gtk_window_set_keep_above(GTK_WINDOW(window), is_on_top);
+    if (is_maximized)
+        gtk_window_maximize(GTK_WINDOW(window));
     gtk_widget_show(window);                
     set_title_saved(FALSE);
 
@@ -929,26 +935,22 @@ int build_ui()
     return 0;
 }
 
-static int handle_command_line_args(GApplication *application, 
-                                    GApplicationCommandLine *cmdline)
+int main(int argc, char *argv[])
 {
-    gchar **argv;
-    gint argc;
-    GError *err = NULL;
-    
-    argv = g_application_command_line_get_arguments(cmdline, &argc);
-
-    // load image from stdin if possible
+    gboolean is_on_top = FALSE, is_maximized = FALSE;
+    // read image from stdin if something is being piped into the app
     if (isatty(0) != 1) {
-        GInputStream *my_stdin = g_application_command_line_get_stdin(cmdline);
-        pix = gdk_pixbuf_new_from_stream(my_stdin, NULL, &err);
+        GError *err = NULL;
+        GInputStream *stdin_stream = g_unix_input_stream_new(0, FALSE);
+
+        pix = gdk_pixbuf_new_from_stream(stdin_stream, NULL, &err);
         if (err || !GDK_IS_PIXBUF(pix)) {
             fprintf(stderr, "Failed to load image from stdin\n%s\n", err->message);
             return 1;
         }
     }
 
-    // handle command line arguments
+    // handle all the other command line arguments
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
             i++;
@@ -959,12 +961,17 @@ static int handle_command_line_args(GApplication *application,
                 dest = argv[i];
             }
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            // TODO: help text
-            printf("PR a help text please\n");
+            printf("PR a help text please\n"); // TODO: help text
             return 1;
+        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
+            printf("%s\n", VERSION);
+            return 0;
+        } else if (strcmp(argv[i], "--ontop") == 0) {
+            is_on_top = TRUE;
+        } else if (strcmp(argv[i], "--maximize") == 0) {
+            is_maximized = TRUE;
         } else if (!GDK_IS_PIXBUF(pix)) { 
-            // only if we don't already have a valid pixbuf at that point
-            err = NULL;
+            GError *err = NULL;
             pix = gdk_pixbuf_new_from_file(argv[1], &err);
             if (err) {
                 fprintf(stderr, "Failed to load image from argument\n%s\n", err->message);
@@ -973,44 +980,34 @@ static int handle_command_line_args(GApplication *application,
         }
     }
 
-    if (err != NULL)
-        g_error_free(err);
-
-    return 0;
-}
-
-// main
-int main(int argc, char *argv[])
-{
-    GApplication *app = g_application_new("org.no37.pinsel", 
-                    G_APPLICATION_HANDLES_COMMAND_LINE);
-    g_signal_connect(app, "command-line", 
-                    G_CALLBACK(handle_command_line_args), NULL);
-
-    if (g_application_run(app, argc, argv))
-        return 1;
-
     old = gdk_pixbuf_copy(pix);
     reload_pixbuf_sizes();
     history_init(old);
 
     gtk_init(&argc, &argv);
 
-    if (build_ui())
+    if (build_ui(is_on_top, is_maximized))
         return 1;
 
     gtk_main();
 
-    if (isatty(1) != 1) { // the first 1 refers to stdout
+    // write the image to stdout if the apps output gets piped into another program
+    if (isatty(1) != 1) {
         GError *err = NULL;
+        GOutputStream *stdout_stream = g_unix_output_stream_new(1, FALSE);
 
-        if (err != NULL)
+        gdk_pixbuf_save_to_stream(pix, stdout_stream, "png", NULL, &err, NULL);
+        if (err != NULL) {
             printf("%s\n", err->message);
-   
-        if (!write_pixbuf_to_stdout(pix)) {
-            printf("Failed to write the image to stdout\n");
             return 1;
         }
+
+        g_output_stream_flush(stdout_stream, NULL, &err);
+        if (err != NULL) {
+            printf("%s\n", err->message);
+            return 1;
+        }
+
     }
 
     return 0;
