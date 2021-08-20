@@ -350,48 +350,6 @@ static void decrease_radius()
     gtk_adjustment_set_value(radius_scale, radius - DELTA_RADIUS);
 }
 
-
-static gint button_press_event( GtkWidget      *widget,
-                                GdkEventButton *event )
-{
-    int x, y, x_translated, y_translated;
-
-    // get coords
-    x = event->x;
-    y = event->y;
-    x_translated = (x - offset_x - mid_x) / scale;
-    y_translated = (y - offset_y - mid_y) / scale;
-
-    if (mode == TEXT) {
-        text_x = x_translated;
-        text_y = y_translated;
-
-        if (activity == TEXTING) {
-            temporary_text_display();
-        } else {
-            activity = TEXTING;
-            g_clear_object(&before_action);
-            before_action = gdk_pixbuf_copy(pix);
-            gtk_widget_show(GTK_WIDGET(text_dialog));
-        }
-    } // else if (mode == BRUSHING) {
-      // TODO: draw dot on click in brush mode
-    /*     coord_t* temp = g_new(coord_t, 1); */
-    /*     temp->x = x_translated; */
-    /*     temp->y = y_translated; */
-    /*     coords = g_list_append(coords, temp); */
-    /*     g_clear_object(&before_action); */
-    /*     before_action = gdk_pixbuf_copy(pix); */
-    /*     g_clear_object(&pix); */
-    /*     pix = draw_line(before_action, coords, &color1, radius); */
-    /*     change(); */
-    /*     g_list_free_full(coords, g_free); */
-    /*     coords = NULL; */
-    /* } */
-
-    return TRUE;
-}
-
 static void redraw_popup(GtkWidget *temp, gpointer popup)
 {
     gtk_widget_queue_draw(GTK_WIDGET(popup));
@@ -705,6 +663,44 @@ static gboolean mouse_scroll( GtkWidget *widget,
     return TRUE;
 }
 
+static void area_clicked_on(GtkWidget      *widget,
+                            GdkEventButton *event)
+{
+    int x, y, x_translated, y_translated;
+
+    // get coords
+    x = event->x;
+    y = event->y;
+    x_translated = (x - offset_x - mid_x) / scale;
+    y_translated = (y - offset_y - mid_y) / scale;
+
+    if (mode == TEXT) {
+        text_x = x_translated;
+        text_y = y_translated;
+
+        if (activity == TEXTING) {
+            temporary_text_display();
+        } else {
+            activity = TEXTING;
+            g_clear_object(&before_action);
+            before_action = gdk_pixbuf_copy(pix);
+            gtk_widget_show(GTK_WIDGET(text_dialog));
+        }
+    } // else if ((mode == BRUSH) && (event->button == 1) && (event->type == GDK_BUTTON_PRESS)) {
+      // TODO: draw dot on click in brush mode
+        /* coord_t* temp = g_new(coord_t, 1); */
+        /* temp->x = x_translated; */
+        /* temp->y = y_translated; */
+        /* coords = g_list_append(coords, temp); */
+        /* g_clear_object(&before_action); */
+        /* before_action = gdk_pixbuf_copy(pix); */
+        /* g_clear_object(&pix); */
+        /* pix = draw_line(before_action, coords, &color1, radius); */
+        /* change(); */
+        /* g_list_free_full(coords, g_free); */
+        /* coords = NULL; */
+    /* } */
+}
 
 // global keybinds
 static void my_key_press(GtkWidget *widget,
@@ -795,13 +791,14 @@ int build_ui(gboolean is_on_top, gboolean is_maximized)
     g_signal_connect (G_OBJECT(canvas), "motion_notify_event", 
                     G_CALLBACK(motion_notify_event), NULL);
     g_signal_connect (G_OBJECT(canvas), "button_press_event", 
-                    G_CALLBACK(button_press_event), NULL);
+                    G_CALLBACK(area_clicked_on), NULL);
     g_signal_connect (G_OBJECT(canvas), "scroll-event", 
                     G_CALLBACK(mouse_scroll), NULL);
 
     gtk_widget_set_events (canvas, GDK_EXPOSURE_MASK
                        | GDK_LEAVE_NOTIFY_MASK
                        | GDK_BUTTON_PRESS_MASK
+                       | GDK_KEY_PRESS_MASK
                        | GDK_POINTER_MOTION_MASK
                        | GDK_POINTER_MOTION_HINT_MASK
                        | GDK_SCROLL_MASK);
@@ -938,6 +935,8 @@ int build_ui(gboolean is_on_top, gboolean is_maximized)
 int main(int argc, char *argv[])
 {
     gboolean is_on_top = FALSE, is_maximized = FALSE;
+    char* output_format = "png";
+
     // read image from stdin if something is being piped into the app
     if (isatty(0) != 1) {
         GError *err = NULL;
@@ -955,13 +954,13 @@ int main(int argc, char *argv[])
         if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
             i++;
             if (i >= argc) {
-                fprintf(stderr, "Missing argument for -o\n");
+                fprintf(stderr, "Missing argument for '%s'\n", argv[i - 1]);
                 return 1;
             } else {
                 dest = argv[i];
             }
         } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            printf("PR a help text please\n"); // TODO: help text
+            print_help();
             return 1;
         } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
             printf("%s\n", VERSION);
@@ -996,7 +995,7 @@ int main(int argc, char *argv[])
         GError *err = NULL;
         GOutputStream *stdout_stream = g_unix_output_stream_new(1, FALSE);
 
-        gdk_pixbuf_save_to_stream(pix, stdout_stream, "png", NULL, &err, NULL);
+        gdk_pixbuf_save_to_stream(pix, stdout_stream, output_format, NULL, &err, NULL);
         if (err != NULL) {
             printf("%s\n", err->message);
             return 1;
@@ -1007,7 +1006,6 @@ int main(int argc, char *argv[])
             printf("%s\n", err->message);
             return 1;
         }
-
     }
 
     return 0;

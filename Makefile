@@ -4,7 +4,7 @@ INSTALLDIR    := /usr/local/bin
 DATADIR       := ./data
 SRCDIR        := ./src
 OBJDIR        := ./obj
-UIFILES       := $(wildcard $(DATADIR)/*.ui)
+UIFILES       := $(wildcard $(DATADIR)/*.ui) $(DATADIR)/help.txt
 RESFILE       := $(SRCDIR)/resources.c
 CFILES        := $(wildcard $(SRCDIR)/*.c) $(RESFILE)
 OBJFILES      := $(CFILES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
