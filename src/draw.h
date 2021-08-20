@@ -54,8 +54,7 @@ extern GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on,
 extern GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on, 
                             char *text, 
                             GdkRGBA *color, 
-                            char *font,
-                            int font_size,
+                            PangoFontDescription *font_desc,
                             int x, 
                             int y);
 

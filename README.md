@@ -42,6 +42,7 @@ sudo make install # will put the binary in /usr/local/bin
 ![](https://cdn.discordapp.com/attachments/833686255446917123/874025047524798525/output.gif)
 
 ## TODO
+- [x] allow for all font faces
 - [ ] add `--help` text, man page
 - [ ] allow for other formats than png
 - [ ] make text actually draggable when the dialog is open

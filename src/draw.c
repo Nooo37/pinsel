@@ -1,6 +1,6 @@
 #include <gtk/gtk.h>
-#include "draw.h"
 
+#include "draw.h"
 
 cairo_surface_t* strokes_to_surface(GList *positions,
                                     GdkRGBA *color,
@@ -36,9 +36,10 @@ cairo_surface_t* strokes_to_surface(GList *positions,
         cairo_line_to(cr, value->x, value->y);
         listrunner = g_list_next(listrunner);
     }
-    g_list_free(listrunner);
 
     cairo_stroke(cr);
+
+    g_list_free(listrunner);
     cairo_destroy(cr);
 
     return surface;
@@ -66,6 +67,7 @@ GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on,
     cairo_paint(cr);
 
     result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+
     cairo_destroy(cr);
     cairo_surface_destroy(surface);
     cairo_surface_destroy(strokes);
@@ -76,8 +78,7 @@ GdkPixbuf* draw_line(GdkPixbuf *to_be_drawn_on,
 GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on, 
                      char *text, 
                      GdkRGBA *color, 
-                     char *font,
-                     int font_size,
+                     PangoFontDescription *font_desc,
                      int x, 
                      int y)
 {
@@ -85,6 +86,10 @@ GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
     cairo_surface_t *surface;
     cairo_t *cr;
     int img_width, img_height;
+    PangoContext* context = NULL;
+    PangoLayout* layout = NULL;
+    PangoFontMap* font_map = NULL;
+
 
     img_width = gdk_pixbuf_get_width(to_be_drawn_on), 
     img_height = gdk_pixbuf_get_height(to_be_drawn_on);
@@ -95,16 +100,24 @@ GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
 
     gdk_cairo_set_source_pixbuf(cr, to_be_drawn_on, 0, 0);
     cairo_paint(cr);
-    cairo_select_font_face(cr, font, 
-                    CAIRO_FONT_SLANT_NORMAL, 
-                    CAIRO_FONT_WEIGHT_BOLD);
-
-    cairo_set_font_size(cr, font_size);
     cairo_set_source_rgba(cr, color->red, color->green, color->blue, color->alpha);
     cairo_move_to(cr, x, y);
-    cairo_show_text(cr, text);  
+
+    font_map = pango_cairo_font_map_new();
+
+    context = pango_font_map_create_context(font_map);
+
+    layout = pango_layout_new(context);
+
+    pango_layout_set_font_description(layout, font_desc);
+    pango_font_map_load_font(font_map, context, font_desc);
+
+    pango_layout_set_markup(layout, text, -1);
+
+    pango_cairo_show_layout(cr, layout);
 
     result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+
     cairo_destroy(cr);
     cairo_surface_destroy(surface);
 
@@ -139,6 +152,7 @@ extern GdkPixbuf* erase_area(GdkPixbuf *original,
     cairo_t *cr;
     cairo_surface_t *surface;
     int img_height, img_width;
+    GdkPixbuf *result;
 
     // assertion: original and current have the same height and width
     img_width = gdk_pixbuf_get_width(original);
@@ -153,7 +167,12 @@ extern GdkPixbuf* erase_area(GdkPixbuf *original,
     cairo_mask_surface(cr, mask, 0, 0);
     cairo_fill(cr);
 
-    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+    result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+
+    return result;
 }
 
 extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
@@ -165,11 +184,16 @@ extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
     cairo_surface_t *strokes;
     GdkRGBA color;
     int img_height, img_width;
+    GdkPixbuf *result;
 
     color.red = color.green = color.blue = 0;
     color.alpha = alpha;
     img_width = gdk_pixbuf_get_width(original);
     img_height = gdk_pixbuf_get_height(original);
     strokes = strokes_to_surface(positions, &color, width, img_width, img_height);
-    return erase_area(original, current, strokes);
+    result = erase_area(original, current, strokes);
+
+    cairo_surface_destroy(strokes);
+
+    return result;
 }

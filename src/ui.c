@@ -1,13 +1,12 @@
 #include <stdlib.h>
 #include <libgen.h>
 #include <gtk/gtk.h>
-#include <gio/gunixoutputstream.h>
-#include <gio/gunixinputstream.h>
+#include <pango/pangocairo.h>
 
 #include "draw.h"
 #include "utils.h"
 #include "history.h"
-#include "config.h"
+#include "pinsel.h"
 
 typedef enum {
     BRUSH,
@@ -73,10 +72,9 @@ int offset_old_y = 0;
 
 // text tool
 gchar *text = "";
-gchar *font = "Sans";
 int text_x = 20;
 int text_y = 20;
-int font_size = 12;
+PangoFontDescription *font_desc;
 
 // updates the drawing area based on global state
 static gboolean update_drawing_area() 
@@ -169,6 +167,7 @@ static gint motion_notify_event( GtkWidget *widget,
             temp->y = y_translated;
             coords = g_list_append(coords, start_line);
             coords = g_list_append(coords, temp);
+            g_clear_object(&pix);
             pix = draw_line(before_action, coords, &color1, radius);
             update_drawing_area();
             g_free(temp);
@@ -279,7 +278,7 @@ static gint motion_notify_event( GtkWidget *widget,
 void temporary_text_display()
 {
     g_clear_object(&pix);
-    pix = draw_text(before_action, text, &color1, font, font_size, text_x, text_y);
+    pix = draw_text(before_action, text, &color1, font_desc, text_x, text_y);
     update_drawing_area();
 }
 
@@ -429,7 +428,7 @@ static void quit_text_tool_ok()
 {
     quit_text();
     before_action = pix;
-    pix = draw_text(before_action, text, &color1, font, font_size, text_x, text_y);
+    pix = draw_text(before_action, text, &color1, font_desc, text_x, text_y);
     change();
 }
 
@@ -519,11 +518,10 @@ static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
 
 static void on_font_set(GtkFontButton* button, gpointer user_data)
 {
-    const char* font_name = pango_font_family_get_name(gtk_font_chooser_get_font_family((GtkFontChooser*) button));
-    /* char* font_face = pango_font_face_get_face_name(gtk_font_chooser_get_font_face((GtkFontChooser*) button)); */
-    // TODO: support for font faces
-    font_size = gtk_font_chooser_get_font_size((GtkFontChooser*) button) / 1000;
-    font = font_name;
+    /* const char* font_name = pango_font_family_get_name(gtk_font_chooser_get_font_family((GtkFontChooser*) button)); */
+    font_desc = gtk_font_chooser_get_font_desc((GtkFontChooser*) button);
+    /* font = font_name; */
+
     temporary_text_display();
 }
 
@@ -750,7 +748,10 @@ static void my_key_press(GtkWidget *widget,
 }
 
 // build the gtk ui and connects all signals
-int build_ui(gboolean is_on_top, gboolean is_maximized)
+extern int build_ui(GdkPixbuf *init_pix,
+                    char *init_dest,
+                    gboolean is_on_top, 
+                    gboolean is_maximized)
 {
     GtkBuilder *builder; 
     GtkButton *undo_button, *redo_button, *fullscreen_button,
@@ -764,6 +765,9 @@ int build_ui(gboolean is_on_top, gboolean is_maximized)
     GtkTextBuffer *textbuffer;
     GtkFontButton *font_button;
     GtkWidget *popover, *about_dialog, *shortcuts_dialog;
+
+    dest = init_dest;
+    pix = init_pix;
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
@@ -927,87 +931,18 @@ int build_ui(gboolean is_on_top, gboolean is_maximized)
     gtk_widget_show(window);                
     set_title_saved(FALSE);
 
-    update_drawing_area();
-    scale = get_sane_scale(img_width, img_height, area_width, area_height);
-    return 0;
-}
-
-int main(int argc, char *argv[])
-{
-    gboolean is_on_top = FALSE, is_maximized = FALSE;
-    char* output_format = "png";
-
-    // read image from stdin if something is being piped into the app
-    if (isatty(0) != 1) {
-        GError *err = NULL;
-        GInputStream *stdin_stream = g_unix_input_stream_new(0, FALSE);
-
-        pix = gdk_pixbuf_new_from_stream(stdin_stream, NULL, &err);
-        if (err || !GDK_IS_PIXBUF(pix)) {
-            fprintf(stderr, "Failed to load image from stdin\n%s\n", err->message);
-            return 1;
-        }
-    }
-
-    // handle all the other command line arguments
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-o") == 0 || strcmp(argv[i], "--output") == 0) {
-            i++;
-            if (i >= argc) {
-                fprintf(stderr, "Missing argument for '%s'\n", argv[i - 1]);
-                return 1;
-            } else {
-                dest = argv[i];
-            }
-        } else if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
-            print_help();
-            return 1;
-        } else if (strcmp(argv[i], "-v") == 0 || strcmp(argv[i], "--version") == 0) {
-            printf("%s\n", VERSION);
-            return 0;
-        } else if (strcmp(argv[i], "--ontop") == 0) {
-            is_on_top = TRUE;
-        } else if (strcmp(argv[i], "--maximize") == 0) {
-            is_maximized = TRUE;
-        } else if (!GDK_IS_PIXBUF(pix)) { 
-            GError *err = NULL;
-            pix = gdk_pixbuf_new_from_file(argv[1], &err);
-            if (err) {
-                fprintf(stderr, "Failed to load image from argument\n%s\n", err->message);
-                return 1;
-            }
-        }
-    }
-
     old = gdk_pixbuf_copy(pix);
     reload_pixbuf_sizes();
     history_init(old);
 
-    gtk_init(&argc, &argv);
-
-    if (build_ui(is_on_top, is_maximized))
-        return 1;
-
-    gtk_main();
-
-    // write the image to stdout if the apps output gets piped into another program
-    if (isatty(1) != 1) {
-        GError *err = NULL;
-        GOutputStream *stdout_stream = g_unix_output_stream_new(1, FALSE);
-
-        gdk_pixbuf_save_to_stream(pix, stdout_stream, output_format, NULL, &err, NULL);
-        if (err != NULL) {
-            printf("%s\n", err->message);
-            return 1;
-        }
-
-        g_output_stream_flush(stdout_stream, NULL, &err);
-        if (err != NULL) {
-            printf("%s\n", err->message);
-            return 1;
-        }
-    }
-
+    update_drawing_area();
+    scale = get_sane_scale(img_width, img_height, area_width, area_height);
+    font_desc = gtk_font_chooser_get_font_desc(GTK_FONT_CHOOSER(font_button));
     return 0;
+}
+
+extern GdkPixbuf* get_pixbuf()
+{
+    return pix;
 }
 
