@@ -7,16 +7,6 @@
 
 
 /*
- * Types
- */ 
-
-typedef struct
-{
-    int x;
-    int y;
-} coord_t;
-
-/*
  * Merges two pixbufs 
  *
  * top_one: The pixbufs that gets drawn on the top
@@ -67,7 +57,6 @@ extern GdkPixbuf* draw_text(GdkPixbuf *to_be_drawn_on,
  * mask: The area on which this function erases
  */
 extern GdkPixbuf* erase_area(GdkPixbuf *original,
-                             GdkPixbuf *current,
                              cairo_surface_t *mask);
 
 /*
@@ -81,7 +70,6 @@ extern GdkPixbuf* erase_area(GdkPixbuf *original,
  * alpha: The alpha value of the line
  */
 extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
-                                   GdkPixbuf *current,
                                    GList *positions,
                                    int width,
                                    float alpha);

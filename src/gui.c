@@ -3,30 +3,14 @@
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
 
-#include "draw.h"
+#include "gui.h"
+#include "pixbuf.h"
 #include "utils.h"
-#include "history.h"
 #include "pinsel.h"
-
-typedef enum {
-    BRUSH,
-    ERASER,
-    TEXT
-} Mode;
-
-typedef enum {
-    BRUSHING,
-    LINING,
-    ERASING,
-    TEXTING,
-    DRAGGING,
-    IDLE
-} Activity;
 
 // global state. I hope that is how one does C
 Mode mode = BRUSH;
 Activity activity = IDLE;
-char *dest = NULL;
 
 // Gtk
 GdkDisplay *display;
@@ -41,19 +25,14 @@ GtkToggleButton *eraser_toggle;
 GtkToggleButton *text_toggle;
 GtkAdjustment *radius_scale;
 
-// pixbufs
-GdkPixbuf *pix;
-GdkPixbuf *old;
-GdkPixbuf *before_action;
-int img_width = 0;
-int img_height = 0;
-
 // geometry
 float scale = 1;
 int mid_x = 0;
 int mid_y = 0;
 int offset_x = 0;
 int offset_y = 0;
+int img_width = 0;
+int img_height = 0;
 int area_width;
 int area_height;
 
@@ -76,25 +55,31 @@ int text_x = 20;
 int text_y = 20;
 PangoFontDescription *font_desc;
 
+// actions
+BrushAction brush_action;
+EraseAction erase_action;
+TextAction text_action;
+
+
 // updates the drawing area based on global state
-static gboolean update_drawing_area() 
+static void update_drawing_area() 
 {
-    /* cairo_t *cr; */
     GtkAllocation *alloc = g_new(GtkAllocation, 1);
     gtk_widget_get_allocation(canvas, alloc);
     area_width = alloc->width;
     area_height = alloc->height;
 
     // initalize stuff
-    /* cr = gdk_cairo_create(gtk_widget_get_window(canvas)); */
-    cairo_region_t* cairoRegion = cairo_region_create();
+    cairo_region_t* cairo_region = cairo_region_create();
     GdkWindow* window = gtk_widget_get_window(canvas);
-    GdkDrawingContext* drawingContext = gdk_window_begin_draw_frame (window,cairoRegion);
-    cairo_t* cr = gdk_drawing_context_get_cairo_context (drawingContext);
+    GdkDrawingContext* drawing_context = gdk_window_begin_draw_frame (window,cairo_region);
+    cairo_t* cr = gdk_drawing_context_get_cairo_context (drawing_context);
 
     // "clear" background
     cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
     cairo_paint(cr);
+    // this would be a cool alternative but it is very much slower
+    /* gtk_widget_queue_draw(canvas); */
 
     // update geometry
     mid_x = (area_width - img_width * scale) / 2;
@@ -103,39 +88,40 @@ static gboolean update_drawing_area()
     // draw
     cairo_translate(cr, mid_x + offset_x, mid_y + offset_y);
     cairo_scale(cr, scale, scale);
-    gdk_cairo_set_source_pixbuf(cr, pix, 0, 0);
+    GdkPixbuf* temp = pix_get_displayed();
+    gdk_cairo_set_source_pixbuf(cr, temp, 0, 0);
     cairo_paint(cr);
 
     // cleanup
-    gdk_window_end_draw_frame(window,drawingContext);
-    cairo_region_destroy(cairoRegion);
+    gdk_window_end_draw_frame(window, drawing_context);
+    cairo_region_destroy(cairo_region);
     g_free(alloc);
-
-    return TRUE;
+    g_object_unref(temp);
 }
 
 static void set_title_saved(gboolean is_saved)
 {
-    if (dest == NULL)
+    if (pix_get_dest() == NULL)
         gtk_window_set_title((GtkWindow*) window, "*untitled");
     else if (is_saved)
-        gtk_window_set_title((GtkWindow*) window, basename(dest));
+        gtk_window_set_title((GtkWindow*) window, basename(pix_get_dest()));
     else {
-        char *temp = g_strdup_printf("*%s", basename(dest));
+        char *temp = g_strdup_printf("*%s", basename(pix_get_dest()));
         gtk_window_set_title((GtkWindow*) window, temp);
-        free(temp);
     }
 }
 
 void reload_pixbuf_sizes()
 {
-    img_width = gdk_pixbuf_get_width(pix);
-    img_height = gdk_pixbuf_get_height(pix);
+    GdkPixbuf* temp = pix_get_displayed();
+    img_width = gdk_pixbuf_get_width(temp);
+    img_height = gdk_pixbuf_get_height(temp);
+    g_object_unref(temp);
 }
 
 static void change()
 {
-    history_add_one(pix);
+    /* history_add_one(pix); */
     set_title_saved(FALSE);
     update_drawing_area();
 }
@@ -167,8 +153,15 @@ static gint motion_notify_event( GtkWidget *widget,
             temp->y = y_translated;
             coords = g_list_append(coords, start_line);
             coords = g_list_append(coords, temp);
-            g_clear_object(&pix);
-            pix = draw_line(before_action, coords, &color1, radius);
+
+            brush_action.width = radius;
+            brush_action.positions = coords;
+
+            Action temp_action;
+            temp_action.type = BRUSH_ACTION;
+            temp_action.brush = &brush_action;
+
+            pix_add_action_temporarily(&temp_action);
             update_drawing_area();
             g_free(temp);
             g_list_free(coords);
@@ -178,8 +171,6 @@ static gint motion_notify_event( GtkWidget *widget,
             start_line = g_new(coord_t, 1);
             start_line->x = x_translated;
             start_line->y = y_translated;
-            g_clear_object(&before_action);
-            before_action = gdk_pixbuf_copy(pix);
         }
         return TRUE;
     } else {
@@ -189,7 +180,15 @@ static gint motion_notify_event( GtkWidget *widget,
             temp->y = y_translated;
             coords = g_list_append(coords, start_line);
             coords = g_list_append(coords, temp);
-            pix = draw_line(before_action, coords, &color1, radius);
+
+            brush_action.width = radius;
+            brush_action.positions = coords;
+
+            Action temp_action;
+            temp_action.type = BRUSH_ACTION;
+            temp_action.brush = &brush_action;
+
+            pix_add_action_permanently(&temp_action);
             g_free(temp);
             g_list_free(coords);
             g_free(start_line);
@@ -208,18 +207,30 @@ static gint motion_notify_event( GtkWidget *widget,
             temp->x = x_translated;
             temp->y = y_translated;
             coords = g_list_append(coords, temp);
-            g_clear_object(&pix);
-            pix = draw_line(before_action, coords, &color1, radius);
+
+            brush_action.width = radius;
+            brush_action.positions = coords;
+
+            Action temp_action;
+            temp_action.type = BRUSH_ACTION;
+            temp_action.brush = &brush_action;
+
+            pix_add_action_temporarily(&temp_action);
             update_drawing_area();
         } else {
             activity = BRUSHING;
-            g_clear_object(&before_action);
-            before_action = gdk_pixbuf_copy(pix);
             update_drawing_area();
         }
     } else {
         if (activity == BRUSHING) {
-            pix = draw_line(before_action, coords, &color1, radius);
+            brush_action.width = radius;
+            brush_action.positions = coords;
+
+            Action temp_action;
+            temp_action.type = BRUSH_ACTION;
+            temp_action.brush = &brush_action;
+
+            pix_add_action_permanently(&temp_action);
             g_list_free_full(coords, g_free);
             coords = NULL;
             change();
@@ -235,18 +246,34 @@ static gint motion_notify_event( GtkWidget *widget,
             temp->x = x_translated;
             temp->y = y_translated;
             coords = g_list_append(coords, temp);
-            g_clear_object(&pix);
-            pix = erase_under_line(old, before_action, coords, radius, 1.0);
+
+            EraseAction my_erase_action;
+            my_erase_action.width = radius;
+            my_erase_action.positions = coords;
+            my_erase_action.alpha = 1;
+
+            Action temp_action;
+            temp_action.type = ERASE_ACTION;
+            temp_action.erase = &my_erase_action;
+
+            pix_add_action_temporarily(&temp_action);
             update_drawing_area();
         } else {
             activity = ERASING;
-            g_clear_object(&before_action);
-            before_action = gdk_pixbuf_copy(pix);
             update_drawing_area();
         }
     } else {
         if (activity == ERASING) {
-            pix = erase_under_line(old, before_action, coords, radius, 1.0);
+            EraseAction my_erase_action;
+            my_erase_action.width = radius;
+            my_erase_action.positions = coords;
+            my_erase_action.alpha = 1;
+
+            Action temp_action;
+            temp_action.type = ERASE_ACTION;
+            temp_action.erase = &my_erase_action;
+
+            pix_add_action_permanently(&temp_action);
             g_list_free_full(coords, g_free);
             coords = NULL;
             change();
@@ -277,12 +304,19 @@ static gint motion_notify_event( GtkWidget *widget,
 
 void temporary_text_display()
 {
-    g_clear_object(&pix);
-    pix = draw_text(before_action, text, &color1, font_desc, text_x, text_y);
+    TextAction temp_text_action;
+    temp_text_action.text = text;
+    temp_text_action.font = font_desc;
+    temp_text_action.color = &color1;
+    temp_text_action.x = text_x;
+    temp_text_action.y = text_y;
+    Action temp_action;
+    temp_action.type = TEXT_ACTION;
+    temp_action.text = &temp_text_action;
+    pix_add_action_temporarily(&temp_action);
     update_drawing_area();
 }
 
-// the function to connect to, to update the drawing area on resize
 static gboolean on_draw (GtkWidget *da, 
                          cairo_t *cr, 
                          gpointer data)
@@ -291,7 +325,6 @@ static gboolean on_draw (GtkWidget *da,
     return FALSE;
 }
 
-// increases the scale of the image
 static gboolean increase_scale()
 {
     scale += DELTA_ZOOM;
@@ -299,7 +332,6 @@ static gboolean increase_scale()
     return FALSE;
 }
 
-// decreases the scale of the image
 static gboolean decrease_scale()
 {
     scale -= DELTA_ZOOM;
@@ -307,7 +339,6 @@ static gboolean decrease_scale()
     return FALSE;
 }
 
-// increases the x offset
 static gboolean increase_offset_x()
 {
     offset_x += DELTA_MOVE;
@@ -315,7 +346,6 @@ static gboolean increase_offset_x()
     return FALSE;
 }
 
-// decreases the x offset
 static gboolean decrease_offset_x()
 {
     offset_x -= DELTA_MOVE;
@@ -323,7 +353,6 @@ static gboolean decrease_offset_x()
     return FALSE;
 }
 
-// increases the y offset
 static gboolean increase_offset_y()
 {
     offset_y += DELTA_MOVE;
@@ -331,7 +360,6 @@ static gboolean increase_offset_y()
     return FALSE;
 }
 
-// decreases the y offset
 static gboolean decrease_offset_y()
 {
     offset_y -= DELTA_MOVE;
@@ -359,10 +387,9 @@ static void fullscreen(GtkWidget *temp, gpointer window)
     gtk_window_fullscreen(GTK_WINDOW(window));
 }
 
-// undo all changes
 static void undo_all_changes() 
 {
-    pix = history_undo_all();
+    pix_undo_all();
     reload_pixbuf_sizes();
     set_title_saved(FALSE);
     offset_x = 0;
@@ -374,38 +401,44 @@ static void fit_zoom()
 {
     offset_x = 0;
     offset_y = 0;
-    // TOOD: set scale to get_sane_scale
     scale = get_sane_scale(img_width, img_height, area_width, area_height);
     update_drawing_area();
 }
 
 static void flip_horizontally()
 {
-    pix = gdk_pixbuf_flip(pix, TRUE);
+    Action temp_action;
+    temp_action.type = FLIP_HORIZONTALLY;
+    pix_add_action_permanently(&temp_action);
     change();
 }
 
 static void flip_vertically()
 {
-    pix = gdk_pixbuf_flip(pix, FALSE);
+    Action temp_action;
+    temp_action.type = FLIP_VERTICALLY;
+    pix_add_action_permanently(&temp_action);
     change();
 }
 
 static void rotate_left()
 {
-    pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
+    Action temp_action;
+    temp_action.type = ROTATE_COUNTERCLOCKWISE;
+    pix_add_action_permanently(&temp_action);
     reload_pixbuf_sizes();
     change();
 }
 
 static void rotate_right()
 {
-    pix = gdk_pixbuf_rotate_simple(pix, GDK_PIXBUF_ROTATE_CLOCKWISE);
+    Action temp_action;
+    temp_action.type = ROTATE_CLOCKWISE;
+    pix_add_action_permanently(&temp_action);
     reload_pixbuf_sizes();
     change();
 }
 
-// switch primary and secondary color
 static void switch_colors()
 {
     GdkRGBA temp;
@@ -416,26 +449,30 @@ static void switch_colors()
 
 static void quit_text()
 {
-    /* mode = BRUSH; */
     activity = IDLE;
-    gtk_toggle_button_set_active(brush_toggle, TRUE);
-    gtk_toggle_button_set_active(eraser_toggle, FALSE);
-    gtk_toggle_button_set_active(text_toggle, FALSE);
     gtk_widget_hide((GtkWidget*) text_dialog);
 }
 
 static void quit_text_tool_ok()
 {
     quit_text();
-    before_action = pix;
-    pix = draw_text(before_action, text, &color1, font_desc, text_x, text_y);
+    TextAction temp_text_action;
+    temp_text_action.text = text;
+    temp_text_action.font = font_desc;
+    temp_text_action.color = &color1;
+    temp_text_action.x = text_x;
+    temp_text_action.y = text_y;
+    Action temp_action;
+    temp_action.type = TEXT_ACTION;
+    temp_action.text = &temp_text_action;
+    pix_add_action_permanently(&temp_action);
     change();
 }
 
 static void quit_text_tool_cancel()
 {
     quit_text();
-    pix = before_action;
+    pix_undo_temrporarily_action();
     update_drawing_area();
 }
 
@@ -456,7 +493,6 @@ static void change_color1(GtkColorButton *color_button)
     gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color1);
 }
 
-// connect to that to get the color button to do its job
 static void change_color2(GtkColorButton *color_button)
 {
     gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color2);
@@ -518,15 +554,10 @@ static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
 
 static void on_font_set(GtkFontButton* button, gpointer user_data)
 {
-    /* const char* font_name = pango_font_family_get_name(gtk_font_chooser_get_font_family((GtkFontChooser*) button)); */
     font_desc = gtk_font_chooser_get_font_desc((GtkFontChooser*) button);
-    /* font = font_name; */
-
     temporary_text_display();
 }
 
-
-// connect to that to get the slider to do its job
 static void change_radius(GtkAdjustment *adjust)
 {
     radius = gtk_adjustment_get_value(adjust);
@@ -534,14 +565,14 @@ static void change_radius(GtkAdjustment *adjust)
 
 void undo()
 {
-    pix = history_undo_one();
+    pix_undo();
     set_title_saved(FALSE);
     update_drawing_area();
 }
 
 void redo()
 {
-    pix = history_redo_one();
+    pix_redo();
     set_title_saved(FALSE);
     update_drawing_area();
 }
@@ -549,25 +580,8 @@ void redo()
 void save_image()
 {
     // TODO: error handling
-    gdk_pixbuf_save(pix, dest, "png", NULL, NULL);
+    pix_save();
     set_title_saved(TRUE);
-}
-
-int load_new_image(char* filename)
-{
-    GError *err = NULL;
-
-    if (filename == NULL) 
-        return 1;
-    pix = gdk_pixbuf_new_from_file(filename, &err);
-    if (err) {
-        g_error_free(err);
-        return 1;
-    }
-    old = gdk_pixbuf_copy(pix);
-    reload_pixbuf_sizes();
-    history_init(old);
-    return 0;
 }
 
 void save_as()
@@ -582,11 +596,12 @@ void save_as()
                                           NULL);
     gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog), TRUE);
     
-    if (dest != NULL)
-        gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(dialog), dest);
+    if (pix_get_dest() != NULL)
+        gtk_file_chooser_set_filename(GTK_FILE_CHOOSER(dialog), pix_get_dest());
     
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
-        dest = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        char* temp = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+        pix_set_dest(temp);
         save_image();
     }
     
@@ -595,7 +610,7 @@ void save_as()
 
 void save()
 {
-    if (dest == NULL)
+    if (pix_get_dest() == NULL)
         save_as();
     else
         save_image();
@@ -616,8 +631,7 @@ void open_new_image(GtkWidget *temp, GtkWidget *popover)
     
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
         char* filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-        dest = filename;
-        load_new_image(dest);
+        pix_load_new_image(filename);
         update_drawing_area();
         redraw_popup(NULL, popover);
         g_free(filename);
@@ -666,13 +680,12 @@ static void area_clicked_on(GtkWidget      *widget,
 {
     int x, y, x_translated, y_translated;
 
-    // get coords
     x = event->x;
     y = event->y;
     x_translated = (x - offset_x - mid_x) / scale;
     y_translated = (y - offset_y - mid_y) / scale;
 
-    if (mode == TEXT) {
+    if (event->button == 1 && mode == TEXT) {
         text_x = x_translated;
         text_y = y_translated;
 
@@ -680,24 +693,10 @@ static void area_clicked_on(GtkWidget      *widget,
             temporary_text_display();
         } else {
             activity = TEXTING;
-            g_clear_object(&before_action);
-            before_action = gdk_pixbuf_copy(pix);
             gtk_widget_show(GTK_WIDGET(text_dialog));
         }
-    } // else if ((mode == BRUSH) && (event->button == 1) && (event->type == GDK_BUTTON_PRESS)) {
-      // TODO: draw dot on click in brush mode
-        /* coord_t* temp = g_new(coord_t, 1); */
-        /* temp->x = x_translated; */
-        /* temp->y = y_translated; */
-        /* coords = g_list_append(coords, temp); */
-        /* g_clear_object(&before_action); */
-        /* before_action = gdk_pixbuf_copy(pix); */
-        /* g_clear_object(&pix); */
-        /* pix = draw_line(before_action, coords, &color1, radius); */
-        /* change(); */
-        /* g_list_free_full(coords, g_free); */
-        /* coords = NULL; */
-    /* } */
+    }
+    // TODO: on single click draw dot
 }
 
 // global keybinds
@@ -748,9 +747,7 @@ static void my_key_press(GtkWidget *widget,
 }
 
 // build the gtk ui and connects all signals
-extern int build_ui(GdkPixbuf *init_pix,
-                    char *init_dest,
-                    gboolean is_on_top, 
+extern int build_gui(gboolean is_on_top, 
                     gboolean is_maximized)
 {
     GtkBuilder *builder; 
@@ -765,9 +762,6 @@ extern int build_ui(GdkPixbuf *init_pix,
     GtkTextBuffer *textbuffer;
     GtkFontButton *font_button;
     GtkWidget *popover, *about_dialog, *shortcuts_dialog;
-
-    dest = init_dest;
-    pix = init_pix;
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();
@@ -924,25 +918,27 @@ extern int build_ui(GdkPixbuf *init_pix,
     about_button = GTK_BUTTON(gtk_builder_get_object(builder, "about_button"));
     g_signal_connect(G_OBJECT(about_button), "pressed", 
                     G_CALLBACK(open_about_dialog), (gpointer) about_dialog);
+
     // start
     gtk_window_set_keep_above(GTK_WINDOW(window), is_on_top);
     if (is_maximized)
         gtk_window_maximize(GTK_WINDOW(window));
     gtk_widget_show(window);                
     set_title_saved(FALSE);
-
-    old = gdk_pixbuf_copy(pix);
     reload_pixbuf_sizes();
-    history_init(old);
-
     update_drawing_area();
     scale = get_sane_scale(img_width, img_height, area_width, area_height);
     font_desc = gtk_font_chooser_get_font_desc(GTK_FONT_CHOOSER(font_button));
+
+    brush_action.color = &color1;
+    brush_action.positions = coords;
+    brush_action.width = radius;
+
+    erase_action.positions = coords;
+    erase_action.alpha = 1;
+    erase_action.width = radius;
+
+    text_action.font = font_desc;
+    text_action.color = &color1;
     return 0;
 }
-
-extern GdkPixbuf* get_pixbuf()
-{
-    return pix;
-}
-

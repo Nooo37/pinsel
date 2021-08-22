@@ -1,5 +1,7 @@
 #include <gtk/gtk.h>
 
+#include "pixbuf.h" // shouldn't be here 
+#include "utils.h"
 #include "draw.h"
 
 cairo_surface_t* strokes_to_surface(GList *positions,
@@ -146,7 +148,6 @@ extern GdkPixbuf* merge_pixbufs(GdkPixbuf *top_one,
 }
 
 extern GdkPixbuf* erase_area(GdkPixbuf *original,
-                             GdkPixbuf *current,
                              cairo_surface_t *mask)
 {
     cairo_t *cr;
@@ -161,14 +162,17 @@ extern GdkPixbuf* erase_area(GdkPixbuf *original,
     surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, 
                     img_width, img_height);
     cr = cairo_create(surface);
-    gdk_cairo_set_source_pixbuf(cr, current, 0, 0);
-    cairo_paint(cr);
     gdk_cairo_set_source_pixbuf(cr, original, 0, 0);
+    cairo_paint(cr);
+    // TODO: fix that dependency by actually erasing from `original``
+    GdkPixbuf *temp = pix_get_original();
+    gdk_cairo_set_source_pixbuf(cr, temp, 0, 0);
     cairo_mask_surface(cr, mask, 0, 0);
     cairo_fill(cr);
 
     result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 
+    /* g_object_unref(temp); */
     cairo_destroy(cr);
     cairo_surface_destroy(surface);
 
@@ -176,7 +180,6 @@ extern GdkPixbuf* erase_area(GdkPixbuf *original,
 }
 
 extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
-                                   GdkPixbuf *current,
                                    GList *positions,
                                    int width,
                                    float alpha)
@@ -191,7 +194,7 @@ extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
     img_width = gdk_pixbuf_get_width(original);
     img_height = gdk_pixbuf_get_height(original);
     strokes = strokes_to_surface(positions, &color, width, img_width, img_height);
-    result = erase_area(original, current, strokes);
+    result = erase_area(original, strokes);
 
     cairo_surface_destroy(strokes);
 

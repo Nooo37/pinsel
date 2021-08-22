@@ -36,3 +36,5 @@ extern GdkPixbuf* history_undo_one();
  * return: The resulting "new" pixbuf
  */
 extern GdkPixbuf* history_undo_all();
+
+extern void history_free();

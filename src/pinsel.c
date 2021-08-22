@@ -3,8 +3,9 @@
 #include <gio/gunixinputstream.h>
 
 #include "pinsel.h"
+#include "pixbuf.h"
 #include "utils.h"
-#include "ui.h"
+#include "gui.h"
 
 int main(int argc, char *argv[])
 {
@@ -64,6 +65,8 @@ int main(int argc, char *argv[])
         } else if (!GDK_IS_PIXBUF(init_pix)) { 
             GError *err = NULL;
             init_pix = gdk_pixbuf_new_from_file(argv[i], &err);
+            if (init_dest == NULL)
+                init_dest = argv[i];
             if (err) {
                 fprintf(stderr, "Failed to load image from argument\n%s\n", err->message);
                 return 1;
@@ -76,9 +79,12 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    pix_init(init_pix);
+    pix_set_dest(init_dest);
+
     gtk_init(&argc, &argv);
 
-    if (build_ui(init_pix, init_dest, is_on_top, is_maximized))
+    if (build_gui(is_on_top, is_maximized))
         return 1;
 
     gtk_main();
@@ -88,7 +94,7 @@ int main(int argc, char *argv[])
         GError *err = NULL;
         GOutputStream *stdout_stream = g_unix_output_stream_new(1, FALSE);
 
-        gdk_pixbuf_save_to_stream(get_pixbuf(), stdout_stream, output_format, NULL, &err, NULL);
+        gdk_pixbuf_save_to_stream(pix_get_current(), stdout_stream, output_format, NULL, &err, NULL);
         if (err != NULL) {
             printf("%s\n", err->message);
             return 1;
