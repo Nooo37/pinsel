@@ -21,6 +21,7 @@ First you select your screenshot through maim like you are used to. The result g
 ### Flags
 
 - `-o`, `--output` predefines the save-destination
+- `-f`, `--format` defines the image format of the stdout output
 - `--ontop` puts the window above all others on startup
 - `--maximize` maximizes the window on startup
 - `-h`, `--help`, `-v`, `--version` wip
