@@ -3,6 +3,7 @@
 #include <gio/gunixinputstream.h>
 
 #include "pinsel.h"
+#include "config.h"
 #include "pixbuf.h"
 #include "utils.h"
 #include "gui.h"
@@ -13,6 +14,9 @@ int main(int argc, char *argv[])
     char *output_format = "png";
     gchar *init_dest = NULL;
     GdkPixbuf *init_pix = NULL;
+
+    if (config_init())
+        return 1;
 
     // read image from stdin if something is being piped into the app
     if (isatty(0) != 1) {

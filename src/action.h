@@ -38,6 +38,7 @@ typedef enum {
     REDO,
     UNDO_ALL,
     // ui related actions
+    QUIT_UNSAFE,
     ZOOM,
     MOVE_HORIZONTALLY,
     MOVE_VERTICALLY,

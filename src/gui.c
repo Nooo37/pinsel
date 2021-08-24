@@ -622,46 +622,47 @@ static void my_key_press(GtkWidget *widget,
                          GdkEventKey *event,
                          gpointer user_data) 
 {
-    if ((is_no_mod(event) && event->keyval == 'w') ||
-                    (is_only_control(event) && event->keyval == 'w'))
-        gtk_main_quit();
-    else if ((is_no_mod(event) && event->keyval == 's') ||
-                    (is_only_control(event) && event->keyval == 's'))
-        save();
-    else if (is_only_control(event) && event->keyval == 'S')
-        save_as();
-    else if ((is_no_mod(event) && event->keyval == 'q') ||
-                    (is_only_control(event) && event->keyval == 'w')) {
-        save();
-        gtk_main_quit();
-    }
-    else if ((is_no_mod(event) && event->keyval == 'x') ||
-                    (is_only_control(event) && event->keyval == 'x'))
-        undo_all_changes();
-    else if ((is_no_mod(event) && event->keyval == 'u') || 
-                    (is_only_control(event) && event->keyval == 'z'))
-        undo();
-    else if ((is_no_mod(event) && event->keyval == 'r') || 
-                    (is_only_control(event) && event->keyval == 'Z') ||
-                    (is_only_control(event) && event->keyval == 'y'))
-        redo();
-    else if (is_no_mod(event) && event->keyval == GDK_KEY_Escape)
-        gtk_window_unfullscreen(GTK_WINDOW(window));
-    // movement, zoom
-    else if ((is_no_mod(event) && event->keyval == '+') ||
-                    (is_only_control(event) && event->keyval == '+'))
-        ui_set_scale(ui_get_scale() + DELTA_ZOOM);
-    else if ((is_no_mod(event) && event->keyval == '-') ||
-                    (is_only_control(event) && event->keyval == '-'))
-        ui_set_scale(ui_get_scale() - DELTA_ZOOM);
-    else if (is_no_mod(event) && event->keyval == 'h')
-        ui_set_offset_x(ui_get_offset_x() + DELTA_MOVE);
-    else if (is_no_mod(event) && event->keyval == 'l')
-        ui_set_offset_x(ui_get_offset_x() - DELTA_MOVE);
-    else if (is_no_mod(event) && event->keyval == 'j')
-        ui_set_offset_y(ui_get_offset_y() - DELTA_MOVE);
-    else if (is_no_mod(event) && event->keyval == 'k')
-        ui_set_offset_y(ui_get_offset_y() + DELTA_MOVE);
+    config_perform_event(event);
+    /* if ((is_no_mod(event) && event->keyval == 'w') || */
+    /*                 (is_only_control(event) && event->keyval == 'w')) */
+    /*     gtk_main_quit(); */
+    /* else if ((is_no_mod(event) && event->keyval == 's') || */
+    /*                 (is_only_control(event) && event->keyval == 's')) */
+    /*     save(); */
+    /* else if (is_only_control(event) && event->keyval == 'S') */
+    /*     save_as(); */
+    /* else if ((is_no_mod(event) && event->keyval == 'q') || */
+    /*                 (is_only_control(event) && event->keyval == 'w')) { */
+    /*     save(); */
+    /*     gtk_main_quit(); */
+    /* } */
+    /* else if ((is_no_mod(event) && event->keyval == 'x') || */
+    /*                 (is_only_control(event) && event->keyval == 'x')) */
+    /*     undo_all_changes(); */
+    /* else if ((is_no_mod(event) && event->keyval == 'u') ||  */
+    /*                 (is_only_control(event) && event->keyval == 'z')) */
+    /*     undo(); */
+    /* else if ((is_no_mod(event) && event->keyval == 'r') ||  */
+    /*                 (is_only_control(event) && event->keyval == 'Z') || */
+    /*                 (is_only_control(event) && event->keyval == 'y')) */
+    /*     redo(); */
+    /* else if (is_no_mod(event) && event->keyval == GDK_KEY_Escape) */
+    /*     gtk_window_unfullscreen(GTK_WINDOW(window)); */
+    /* // movement, zoom */
+    /* else if ((is_no_mod(event) && event->keyval == '+') || */
+    /*                 (is_only_control(event) && event->keyval == '+')) */
+    /*     ui_set_scale(ui_get_scale() + DELTA_ZOOM); */
+    /* else if ((is_no_mod(event) && event->keyval == '-') || */
+    /*                 (is_only_control(event) && event->keyval == '-')) */
+    /*     ui_set_scale(ui_get_scale() - DELTA_ZOOM); */
+    /* else if (is_no_mod(event) && event->keyval == 'h') */
+    /*     ui_set_offset_x(ui_get_offset_x() + DELTA_MOVE); */
+    /* else if (is_no_mod(event) && event->keyval == 'l') */
+    /*     ui_set_offset_x(ui_get_offset_x() - DELTA_MOVE); */
+    /* else if (is_no_mod(event) && event->keyval == 'j') */
+    /*     ui_set_offset_y(ui_get_offset_y() - DELTA_MOVE); */
+    /* else if (is_no_mod(event) && event->keyval == 'k') */
+    /*     ui_set_offset_y(ui_get_offset_y() + DELTA_MOVE); */
     update_drawing_area();
     set_title_saved(pix_is_saved());
 }

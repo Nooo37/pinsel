@@ -94,19 +94,22 @@ extern void ui_perform_action(Action* action)
 {
     switch(action->type) {
         case ZOOM: {
-            geo.scale += DELTA_ZOOM;
+            geo.scale += action->zoom;
         } break;
         case MOVE_HORIZONTALLY: {
-            geo.offset_x += DELTA_MOVE;
+            geo.offset_x += action->move;
         } break;
         case MOVE_VERTICALLY: {
-            geo.offset_y += DELTA_MOVE;
+            geo.offset_y += action->move;
         } break;
         case FIT_POSITION: {
             geo.offset_x = 0;
             geo.offset_y = 0;
             geo.scale = get_sane_scale(pix_get_img_width(), pix_get_img_height(),
                             ui_get_area_width(), ui_get_area_height());
+        } break;
+        case QUIT_UNSAFE: {
+            gtk_main_quit();
         } break;
         default:
             return;
