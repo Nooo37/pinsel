@@ -482,25 +482,19 @@ static void change_radius(GtkAdjustment *adjust)
     radius = gtk_adjustment_get_value(adjust);
 }
 
-void undo()
+static void undo()
 {
     config_perform_self_contained_action(UNDO);
     update_drawing_area();
 }
 
-void redo()
+static void redo()
 {
     config_perform_self_contained_action(REDO);
     update_drawing_area();
 }
 
-void save_image()
-{
-    // TODO: error handling
-    pix_save();
-}
-
-void save_as()
+extern void gui_save_as()
 {
     GtkWidget *dialog;
      
@@ -518,22 +512,21 @@ void save_as()
     if (gtk_dialog_run(GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT) {
         char* temp = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
         pix_set_dest(temp);
-        save_image();
+        pix_save();
     }
     
     gtk_widget_destroy (dialog);
 }
 
-void save()
+extern void gui_save()
 {
     if (pix_get_dest() == NULL)
-        save_as();
+        gui_save_as();
     else
-        save_image();
+        pix_save();
 }
 
-
-void open_new_image(GtkWidget *temp, GtkWidget *popover)
+extern void gui_open_new_image()
 {
     GtkWidget *dialog;
      
@@ -549,11 +542,17 @@ void open_new_image(GtkWidget *temp, GtkWidget *popover)
         char* filename = gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
         pix_load_new_image(filename);
         update_drawing_area();
-        redraw_popup(NULL, popover);
         g_free(filename);
     }
     
     gtk_widget_destroy (dialog);
+}
+
+
+static void open_new_image(GtkWidget *temp, GtkPopover *popover)
+{
+    gui_open_new_image();
+    redraw_popup(NULL, popover);
 }
 
 static void open_about_dialog(GtkWidget *temp, gpointer about_dialog)
@@ -623,46 +622,6 @@ static void my_key_press(GtkWidget *widget,
                          gpointer user_data) 
 {
     config_perform_event(event);
-    /* if ((is_no_mod(event) && event->keyval == 'w') || */
-    /*                 (is_only_control(event) && event->keyval == 'w')) */
-    /*     gtk_main_quit(); */
-    /* else if ((is_no_mod(event) && event->keyval == 's') || */
-    /*                 (is_only_control(event) && event->keyval == 's')) */
-    /*     save(); */
-    /* else if (is_only_control(event) && event->keyval == 'S') */
-    /*     save_as(); */
-    /* else if ((is_no_mod(event) && event->keyval == 'q') || */
-    /*                 (is_only_control(event) && event->keyval == 'w')) { */
-    /*     save(); */
-    /*     gtk_main_quit(); */
-    /* } */
-    /* else if ((is_no_mod(event) && event->keyval == 'x') || */
-    /*                 (is_only_control(event) && event->keyval == 'x')) */
-    /*     undo_all_changes(); */
-    /* else if ((is_no_mod(event) && event->keyval == 'u') ||  */
-    /*                 (is_only_control(event) && event->keyval == 'z')) */
-    /*     undo(); */
-    /* else if ((is_no_mod(event) && event->keyval == 'r') ||  */
-    /*                 (is_only_control(event) && event->keyval == 'Z') || */
-    /*                 (is_only_control(event) && event->keyval == 'y')) */
-    /*     redo(); */
-    /* else if (is_no_mod(event) && event->keyval == GDK_KEY_Escape) */
-    /*     gtk_window_unfullscreen(GTK_WINDOW(window)); */
-    /* // movement, zoom */
-    /* else if ((is_no_mod(event) && event->keyval == '+') || */
-    /*                 (is_only_control(event) && event->keyval == '+')) */
-    /*     ui_set_scale(ui_get_scale() + DELTA_ZOOM); */
-    /* else if ((is_no_mod(event) && event->keyval == '-') || */
-    /*                 (is_only_control(event) && event->keyval == '-')) */
-    /*     ui_set_scale(ui_get_scale() - DELTA_ZOOM); */
-    /* else if (is_no_mod(event) && event->keyval == 'h') */
-    /*     ui_set_offset_x(ui_get_offset_x() + DELTA_MOVE); */
-    /* else if (is_no_mod(event) && event->keyval == 'l') */
-    /*     ui_set_offset_x(ui_get_offset_x() - DELTA_MOVE); */
-    /* else if (is_no_mod(event) && event->keyval == 'j') */
-    /*     ui_set_offset_y(ui_get_offset_y() - DELTA_MOVE); */
-    /* else if (is_no_mod(event) && event->keyval == 'k') */
-    /*     ui_set_offset_y(ui_get_offset_y() + DELTA_MOVE); */
     update_drawing_area();
     set_title_saved(pix_is_saved());
 }
@@ -821,10 +780,10 @@ extern int build_gui(gboolean is_on_top,
                     G_CALLBACK(redraw_popup), (gpointer) popover);
     save_button = GTK_BUTTON(gtk_builder_get_object(builder, "save_button"));
     g_signal_connect(G_OBJECT(save_button), "pressed", 
-                    G_CALLBACK(save), NULL);
+                    G_CALLBACK(gui_save), NULL);
     save_as_button = GTK_BUTTON(gtk_builder_get_object(builder, "save_as_button"));
     g_signal_connect(G_OBJECT(save_as_button), "pressed", 
-                    G_CALLBACK(save_as), NULL);
+                    G_CALLBACK(gui_save_as), NULL);
     fullscreen_button = GTK_BUTTON(gtk_builder_get_object(builder, "fullscreen_button"));
     g_signal_connect(G_OBJECT(fullscreen_button), "pressed", 
                     G_CALLBACK(fullscreen), (gpointer) window);

@@ -37,12 +37,15 @@ typedef enum {
     UNDO,
     REDO,
     UNDO_ALL,
+    SAVE,
     // ui related actions
     QUIT_UNSAFE,
     ZOOM,
     MOVE_HORIZONTALLY,
     MOVE_VERTICALLY,
     FIT_POSITION,
+    SAVE_AS,
+    OPEN
 } ActionType;
 
 typedef struct {
@@ -51,10 +54,8 @@ typedef struct {
         BrushAction *brush; /* BRUSH_ACTION */
         EraseAction *erase; /* ERASE_ACTION */
         TextAction *text; /* TEXT_ACTION */
-        gpointer *nothing; // NULL pointer in case the type is self containing
         float zoom; /* ZOOM */
         int move; /* MOVE_HORIZONTALLY, MOVE_VERTICALLY */
-
     };
 } Action;
 

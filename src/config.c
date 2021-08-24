@@ -14,7 +14,7 @@ extern void config_perform_action(Action *action)
 {
     switch (action->type) {
         case ZOOM: case MOVE_HORIZONTALLY: case MOVE_VERTICALLY:
-        case FIT_POSITION: case QUIT_UNSAFE:
+        case FIT_POSITION: case QUIT_UNSAFE: case SAVE_AS: case OPEN:
             ui_perform_action(action);
         default:
             pix_perform_action(action);
@@ -58,10 +58,90 @@ static int config_move_vertically(lua_State *L)
     return 1;
 }
 
+static int config_flip_horizontally(lua_State *L)
+{
+    Action temp;
+    temp.type = FLIP_HORIZONTALLY;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_flip_vertically(lua_State *L)
+{
+    Action temp;
+    temp.type = FLIP_VERTICALLY;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_rotate_clockwise(lua_State *L)
+{
+    Action temp;
+    temp.type = ROTATE_CLOCKWISE;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_rotate_counterclockwise(lua_State *L)
+{
+    Action temp;
+    temp.type = ROTATE_COUNTERCLOCKWISE;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_undo_all(lua_State *L)
+{
+    Action temp;
+    temp.type = UNDO_ALL;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_undo(lua_State *L)
+{
+    Action temp;
+    temp.type = UNDO;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_redo(lua_State *L)
+{
+    Action temp;
+    temp.type = REDO;
+    config_perform_action(&temp);
+    return 1;
+}
+
 static int config_quit_unsafe(lua_State *L)
 {
     Action temp;
     temp.type = QUIT_UNSAFE;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_save(lua_State *L)
+{
+    Action temp;
+    temp.type = SAVE;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_save_as(lua_State *L)
+{
+    Action temp;
+    temp.type = SAVE_AS;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_open(lua_State *L)
+{
+    Action temp;
+    temp.type = OPEN;
     config_perform_action(&temp);
     return 1;
 }
@@ -79,23 +159,32 @@ extern int config_init()
     luaL_openlibs(L);
     lua_newtable(L);
 
-    lua_pushstring(L, "zoom");
-    lua_pushcfunction(L, config_zoom);
-    lua_settable(L, -3);
+    static const luaL_Reg l[] = {
+        { "zoom", config_zoom },
+        { "rotate_counterclockwise", config_rotate_counterclockwise },
+        { "rotate_clockwise", config_rotate_clockwise },
+        { "flip_horizontally", config_flip_horizontally },
+        { "flip_vertically", config_flip_vertically },
+        { "move_horizontally", config_move_horizontally },
+        { "move_vertically", config_move_vertically },
+        { "undo_all", config_undo_all },
+        { "undo", config_undo },
+        { "redo", config_redo },
+        { "save", config_save },
+        { "save_as", config_save_as },
+        { "open", config_open },
+        { "quit", config_quit_unsafe },
+        { NULL, NULL }
+    };
 
-    lua_pushstring(L, "move_horizontally");
-    lua_pushcfunction(L, config_move_horizontally);
-    lua_settable(L, -3);
-
-    lua_pushstring(L, "move_vertically");
-    lua_pushcfunction(L, config_move_vertically);
-    lua_settable(L, -3);
-
-    lua_pushstring(L, "quit");
-    lua_pushcfunction(L, config_quit_unsafe);
-    lua_settable(L, -3);
-
+    luaL_newlib(L, l);
     lua_setglobal(L, "_pinsel");
+
+    lua_pushstring(L, "C-");
+    lua_setglobal(L, "CONTROL");
+
+    lua_pushstring(L, "M-");
+    lua_setglobal(L, "ALT");
 
     int status = luaL_dofile(L, "init.lua");
     if (status) {
@@ -110,10 +199,16 @@ extern void config_perform_event(gpointer event)
 {
     GdkEventKey *ek = (GdkEventKey*) event;
     char *keypress;
+    // TODO: Some adjustment needed for non-letter keys
+    char *keystring = g_strdup_printf("%c", ek->keyval);
     if (is_no_mod(ek))
-        keypress = g_strdup_printf("%c", ek->keyval);
-    else 
-        keypress = g_strdup_printf("C-%c", ek->keyval);
+        keypress = g_strdup_printf("%s", keystring);
+    else if (is_only_control(ek))
+        keypress = g_strdup_printf("C-%s", keystring);
+    else if (is_only_alt(ek))
+        keypress = g_strdup_printf("M-%s", keystring);
+    else if (is_only_alt_control(ek))
+        keypress = g_strdup_printf("C-M-%s", keystring);
     perform_lua_keybind(keypress);
 }
 

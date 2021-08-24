@@ -1,6 +1,7 @@
 #include <gtk/gtk.h>
 
 #include "ui_state.h"
+#include "gui.h"
 #include "pinsel.h"
 #include "utils.h"
 
@@ -110,6 +111,12 @@ extern void ui_perform_action(Action* action)
         } break;
         case QUIT_UNSAFE: {
             gtk_main_quit();
+        } break;
+        case SAVE_AS: {
+            gui_save_as();
+        } break;
+        case OPEN: {
+            gui_open_new_image();
         } break;
         default:
             return;

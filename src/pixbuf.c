@@ -25,7 +25,7 @@ static gboolean should_save_in_history(Action* action)
         return !action->erase->is_temporary;
     if (action->type == TEXT_ACTION)
         return !action->text->is_temporary;
-    return action->type != UNDO && action->type != REDO;
+    return action->type != UNDO && action->type != REDO && action->type != SAVE;
 }
 
 static void update_geo()
@@ -169,31 +169,31 @@ extern void pix_perform_action(Action *action)
                 }
             } break;
         case FLIP_HORIZONTALLY: {
-                GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
+                GdkPixbuf *temp;
                 temp = gdk_pixbuf_copy(draw_layer);
                 g_object_unref(draw_layer);
                 draw_layer = gdk_pixbuf_flip(temp, TRUE);
                 g_object_unref(temp);
                 temp = gdk_pixbuf_copy(original);
                 g_object_unref(original);
-                original = gdk_pixbuf_flip(original, TRUE);
+                original = gdk_pixbuf_flip(temp, TRUE);
                 g_object_unref(temp);
                 copy_pix_to_displayed();
             } break;
         case FLIP_VERTICALLY: { 
-                GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
+                GdkPixbuf *temp;
                 temp = gdk_pixbuf_copy(draw_layer);
                 g_object_unref(draw_layer);
                 draw_layer = gdk_pixbuf_flip(temp, FALSE);
                 g_object_unref(temp);
                 temp = gdk_pixbuf_copy(original);
                 g_object_unref(original);
-                original = gdk_pixbuf_flip(original, FALSE);
+                original = gdk_pixbuf_flip(temp, FALSE);
                 g_object_unref(temp);
                 copy_pix_to_displayed();
             } break;
         case ROTATE_CLOCKWISE: {
-                GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
+                GdkPixbuf *temp;
                 temp = gdk_pixbuf_copy(draw_layer);
                 draw_layer = gdk_pixbuf_rotate_simple(temp, GDK_PIXBUF_ROTATE_COUNTERCLOCKWISE);
                 g_object_unref(temp);
@@ -204,7 +204,7 @@ extern void pix_perform_action(Action *action)
                 update_geo();
             } break;
         case ROTATE_COUNTERCLOCKWISE: {
-                GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
+                GdkPixbuf *temp;
                 temp = gdk_pixbuf_copy(draw_layer);
                 draw_layer = gdk_pixbuf_rotate_simple(temp, GDK_PIXBUF_ROTATE_CLOCKWISE);
                 g_object_unref(temp);
@@ -231,6 +231,9 @@ extern void pix_perform_action(Action *action)
                 draw_layer = gdk_pixbuf_copy(original);
                 copy_pix_to_displayed();
                 update_geo();
+            } break;
+        case SAVE: {
+                pix_save();
             } break;
         default:
             return;
