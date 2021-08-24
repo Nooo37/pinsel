@@ -1,3 +1,6 @@
+#ifndef GUI_H
+#define GUI_H 
+
 #include <gtk/gtk.h>
 
 typedef enum {
@@ -18,3 +21,4 @@ typedef enum {
 extern int build_gui(gboolean is_on_top, 
                      gboolean is_maximized);
 
+#endif

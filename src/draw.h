@@ -1,3 +1,6 @@
+#ifndef DRAW_H
+#define DRAW_H 
+
 #include <gtk/gtk.h>
 
 /*
@@ -5,6 +8,12 @@
  * the dirty work of drawing on a pixbuf
  */
 
+/* types */
+
+typedef struct {
+    GdkPixbuf* content;
+    gboolean is_visible;
+} Layer;
 
 /*
  * Merges two pixbufs 
@@ -73,3 +82,5 @@ extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
                                    GList *positions,
                                    int width,
                                    float alpha);
+
+#endif

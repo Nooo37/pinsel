@@ -1,3 +1,6 @@
+#ifndef PINSEL_H
+#define PINSEL_H
+
 #define SANE_SCALE_MARGIN 0.03
 #define DELTA_MOVE 20
 #define DELTA_ZOOM 0.04
@@ -11,3 +14,4 @@
 #define GET_MACRO(_1,_2,_3,NAME,...) NAME
 #define MATCH(...) else if (GET_MACRO(__VA_ARGS__, MATCH3, MATCH2)(__VA_ARGS__))
 
+#endif

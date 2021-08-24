@@ -38,3 +38,7 @@ extern GdkPixbuf* history_undo_one();
 extern GdkPixbuf* history_undo_all();
 
 extern void history_free();
+
+extern gboolean history_has_undo();
+
+extern gboolean history_has_redo();

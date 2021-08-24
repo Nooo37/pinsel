@@ -36,13 +36,13 @@ extern void history_init(GdkPixbuf *layer)
     current = gdk_pixbuf_copy(layer);
     undo_history = g_queue_new();
     redo_history = g_queue_new();
-    history_add_one(current);
 }
 
 extern void history_add_one(GdkPixbuf *layer)
 {
     g_queue_clear_full(redo_history, g_object_unref);
     history_add_one_to_undo(current);
+    /* g_object_unref(current); */
     current = gdk_pixbuf_copy(layer);
 }
 
@@ -80,4 +80,14 @@ extern void history_free()
     g_queue_clear_full(redo_history, g_object_unref);
     g_object_unref(original);
     g_object_unref(current);
+}
+
+extern gboolean history_has_undo()
+{
+    return !g_queue_is_empty(undo_history);
+}
+
+extern gboolean history_has_redo()
+{
+    return !g_queue_is_empty(redo_history);
 }

@@ -132,6 +132,7 @@ extern GdkPixbuf* merge_pixbufs(GdkPixbuf *top_one,
     cairo_t *cr;
     cairo_surface_t *surface;
     int img_height, img_width;
+    GdkPixbuf *result;
 
     img_width = gdk_pixbuf_get_width(top_one);
     img_height = gdk_pixbuf_get_height(bottom_one);
@@ -144,7 +145,11 @@ extern GdkPixbuf* merge_pixbufs(GdkPixbuf *top_one,
     gdk_cairo_set_source_pixbuf(cr, top_one, 0, 0);
     cairo_paint(cr);
 
-    return gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+    result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
+    cairo_destroy(cr);
+    cairo_surface_destroy(surface);
+
+    return result;
 }
 
 extern GdkPixbuf* erase_area(GdkPixbuf *original,
@@ -172,7 +177,7 @@ extern GdkPixbuf* erase_area(GdkPixbuf *original,
 
     result = gdk_pixbuf_get_from_surface(surface, 0, 0, img_width, img_height);
 
-    /* g_object_unref(temp); */
+    g_object_unref(temp);
     cairo_destroy(cr);
     cairo_surface_destroy(surface);
 
