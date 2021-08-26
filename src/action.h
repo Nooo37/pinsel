@@ -1,6 +1,13 @@
 #ifndef ACTION_H
 #define ACTION_H
+
 #include <gtk/gtk.h>
+
+typedef enum {
+    BRUSH,
+    ERASER,
+    TEXT
+} Mode;
 
 typedef struct {
     GList *positions;
@@ -39,6 +46,10 @@ typedef enum {
     UNDO_ALL,
     SAVE,
     // ui related actions
+    SWITCH_COLORS,
+    SET_COLOR1,
+    SET_COLOR2,
+    SWITCH_MODE,
     QUIT_UNSAFE,
     ZOOM,
     MOVE_HORIZONTALLY,
@@ -54,8 +65,10 @@ typedef struct {
         BrushAction *brush; /* BRUSH_ACTION */
         EraseAction *erase; /* ERASE_ACTION */
         TextAction *text; /* TEXT_ACTION */
+        Mode mode; /* SET_MODE */
         float zoom; /* ZOOM */
         int move; /* MOVE_HORIZONTALLY, MOVE_VERTICALLY */
+        GdkRGBA color; /* SET_COLOR1, SET_COLOR2 */
     };
 } Action;
 

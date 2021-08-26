@@ -5,7 +5,10 @@
 #include "pinsel.h"
 #include "utils.h"
 
-UIGeometry geo;
+static UIGeometry geo;
+static Mode mode;
+GdkRGBA color1; // primary color
+GdkRGBA color2; // secondary color
 
 extern void ui_state_init()
 {
@@ -16,6 +19,7 @@ extern void ui_state_init()
     geo.mid_y = 0;
     geo.offset_x = 0;
     geo.offset_y = 0;
+    mode = BRUSH;
 }
 
 extern void ui_set_area_width(int area_width)
@@ -91,6 +95,34 @@ extern int ui_get_area_width()
     return geo.area_width;
 }
 
+extern Mode ui_get_mode()
+{
+    return mode;
+}
+
+extern void ui_set_mode(Mode new_mode)
+{
+    mode = new_mode;
+}
+
+extern GdkRGBA* ui_get_color1()
+{
+    return &color1;
+}
+
+extern GdkRGBA* ui_get_color2()
+{
+    return &color2;
+}
+
+extern void ui_switch_colors()
+{
+    GdkRGBA temp;
+    temp = color1;
+    color1 = color2;
+    color2 = temp;
+}
+
 extern void ui_perform_action(Action* action)
 {
     switch(action->type) {
@@ -117,6 +149,18 @@ extern void ui_perform_action(Action* action)
         } break;
         case OPEN: {
             gui_open_new_image();
+        } break;
+        case SWITCH_MODE: {
+            ui_set_mode(action->mode);
+        } break;
+        case SWITCH_COLORS: {
+            ui_switch_colors();
+        } break;
+        case SET_COLOR1: {
+            color1 = action->color;
+        } break;
+        case SET_COLOR2: {
+            color2 = action->color;
         } break;
         default:
             return;

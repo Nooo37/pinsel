@@ -4,12 +4,6 @@
 #include <gtk/gtk.h>
 
 typedef enum {
-    BRUSH,
-    ERASER,
-    TEXT
-} Mode;
-
-typedef enum {
     BRUSHING,
     LINING,
     ERASING,
@@ -18,8 +12,8 @@ typedef enum {
     IDLE
 } Activity;
 
-extern int build_gui(gboolean is_on_top, 
-                     gboolean is_maximized);
+extern int gui_init(gboolean is_on_top, 
+                    gboolean is_maximized);
 
 extern void gui_save_as();
 

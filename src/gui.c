@@ -3,13 +3,14 @@
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
 
-#include "gui.h"
 #include "config.h"
+#include "ui_state.h"
+#include "gui.h"
 #include "utils.h"
 #include "pinsel.h"
 
 // global state. I hope that is how one does C
-Mode mode = BRUSH;
+/* Mode mode = BRUSH; */
 Activity activity = IDLE;
 
 // Gtk
@@ -24,11 +25,11 @@ GtkButton *undo_button, *redo_button;
 GtkToggleButton *brush_toggle;
 GtkToggleButton *eraser_toggle;
 GtkToggleButton *text_toggle;
+GtkColorChooser *color_picker_primary;
+GtkColorChooser *color_picker_secondary;
 GtkAdjustment *radius_scale;
 
 // brush settings
-GdkRGBA color1; // primary color
-GdkRGBA color2; // secondary color
 int radius = 10;
 GList *coords = NULL;
 coord_t *start_line = NULL;
@@ -119,7 +120,7 @@ static gint motion_notify_event( GtkWidget *widget,
     y_translated = ui_translate_y(y);
 
     // do a line when holding shift and moving the mouse in brush mode
-    if ((state & GDK_BUTTON1_MASK) && (state & GDK_SHIFT_MASK) && mode == BRUSH) {
+    if ((state & GDK_BUTTON1_MASK) && (state & GDK_SHIFT_MASK) && ui_get_mode() == BRUSH) {
         if (activity == LINING) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
@@ -173,8 +174,8 @@ static gint motion_notify_event( GtkWidget *widget,
     }
 
     // strokes drawing
-    if ((state & GDK_BUTTON1_MASK && mode == BRUSH) ||
-                    ((state & GDK_BUTTON3_MASK && mode == ERASER))) {
+    if ((state & GDK_BUTTON1_MASK && ui_get_mode() == BRUSH) ||
+                    ((state & GDK_BUTTON3_MASK && ui_get_mode() == ERASER))) {
         if (activity == BRUSHING) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
@@ -211,8 +212,8 @@ static gint motion_notify_event( GtkWidget *widget,
     }
 
     // strokes erase
-    if ((state & GDK_BUTTON3_MASK && mode == BRUSH) ||
-                    ((state & GDK_BUTTON1_MASK && mode == ERASER))) {
+    if ((state & GDK_BUTTON3_MASK && ui_get_mode() == BRUSH) ||
+                    ((state & GDK_BUTTON1_MASK && ui_get_mode() == ERASER))) {
         if (activity == ERASING) {
             coord_t* temp = g_new(coord_t, 1);
             temp->x = x_translated;
@@ -278,7 +279,7 @@ void temporary_text_display()
     TextAction temp_text_action;
     temp_text_action.text = text;
     temp_text_action.font = font_desc;
-    temp_text_action.color = &color1;
+    temp_text_action.color = ui_get_color1();
     temp_text_action.x = text_x;
     temp_text_action.y = text_y;
     Action temp_action;
@@ -319,18 +320,13 @@ static void fullscreen(GtkWidget *temp, gpointer window)
 static void fit_zoom()
 {
     config_perform_self_contained_action(FIT_POSITION);
-    /* ui_set_offset_x(0); */
-    /* ui_set_offset_y(0); */
-    /* float scale = get_sane_scale(pix_get_img_width(), pix_get_img_height(), */
-    /*                 ui_get_area_width(), ui_get_area_height()); */
-    /* ui_set_scale(scale); */
     update_drawing_area();
 }
 
 static void undo_all_changes() 
 {
     config_perform_self_contained_action(UNDO_ALL);
-    /* fit_zoom(); */
+    fit_zoom();
     update_drawing_area();
 }
 
@@ -358,14 +354,6 @@ static void rotate_right()
     update_drawing_area();
 }
 
-static void switch_colors()
-{
-    GdkRGBA temp;
-    temp = color1;
-    color1 = color2;
-    color2 = temp;
-}
-
 static void quit_text()
 {
     activity = IDLE;
@@ -378,7 +366,7 @@ static void quit_text_tool_ok()
     TextAction temp_text_action;
     temp_text_action.text = text;
     temp_text_action.font = font_desc;
-    temp_text_action.color = &color1;
+    temp_text_action.color = ui_get_color1();
     temp_text_action.x = text_x;
     temp_text_action.y = text_y;
     Action temp_action;
@@ -398,23 +386,23 @@ static void quit_text_tool_cancel()
 static void update_color_primary(GtkButton *button, gpointer user_data)
 {
     GtkColorChooser *chooser = (GtkColorChooser*) user_data;
-    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), &color1);
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), ui_get_color1());
 }
 
 static void update_color_secondary(GtkButton *button, gpointer user_data)
 {
     GtkColorChooser *chooser = (GtkColorChooser*) user_data;
-    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), &color2);
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(chooser), ui_get_color2());
 }
 
 static void change_color1(GtkColorButton *color_button)
 {
-    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color1);
+    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), ui_get_color1());
 }
 
 static void change_color2(GtkColorButton *color_button)
 {
-    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), &color2);
+    gtk_color_chooser_get_rgba(GTK_COLOR_CHOOSER(color_button), ui_get_color1());
 }
 
 static void update_on_brush_toggle(GtkToggleButton *brush_toggle, gpointer user_data)
@@ -423,11 +411,11 @@ static void update_on_brush_toggle(GtkToggleButton *brush_toggle, gpointer user_
     button_state = gtk_toggle_button_get_active(brush_toggle);
 
     if (button_state == TRUE) {
-        mode = BRUSH;
+        ui_set_mode(BRUSH);
         gtk_toggle_button_set_active(eraser_toggle, FALSE);
         gtk_toggle_button_set_active(text_toggle, FALSE);
     } else {
-        if (mode == BRUSH)
+        if (ui_get_mode() == BRUSH)
             gtk_toggle_button_set_active(brush_toggle, TRUE);
     }
 }
@@ -438,11 +426,11 @@ static void update_on_eraser_toggle(GtkToggleButton *eraser_toggle)
     button_state = gtk_toggle_button_get_active(eraser_toggle);
 
     if (button_state == TRUE) {
-        mode = ERASER;
+        ui_set_mode(ERASER);
         gtk_toggle_button_set_active(text_toggle, FALSE);
         gtk_toggle_button_set_active(brush_toggle, FALSE);
     } else {
-        if (mode == ERASER)
+        if (ui_get_mode() == ERASER)
             gtk_toggle_button_set_active(eraser_toggle, TRUE);
     }
 }
@@ -453,11 +441,11 @@ static void update_on_text_toggle(GtkToggleButton *text_toggle)
     button_state = gtk_toggle_button_get_active(text_toggle);
 
     if (button_state == TRUE) {
-        mode = TEXT;
+        ui_set_mode(TEXT);
         gtk_toggle_button_set_active(eraser_toggle, FALSE);
         gtk_toggle_button_set_active(brush_toggle, FALSE);
     } else {
-        if (mode == TEXT)
+        if (ui_get_mode() == TEXT)
             gtk_toggle_button_set_active(text_toggle, TRUE);
     }
 }
@@ -566,7 +554,8 @@ static void open_shortcuts_dialog(GtkWidget *temp, gpointer shortcuts_dialog)
     GtkBuilder *builder;
     GtkWidget *overlay;
 
-    builder = gtk_builder_new_from_resource("/data/shortcuts.ui");
+    gchar* ui = config_get_shortcut_ui();
+    builder = gtk_builder_new_from_string(ui, -1);
     overlay = GTK_WIDGET(gtk_builder_get_object(builder, "shortcuts_dialog"));
     gtk_window_set_transient_for(GTK_WINDOW(overlay), GTK_WINDOW(window));
     g_object_set(overlay, "view-name", NULL, NULL);
@@ -601,7 +590,7 @@ static void area_clicked_on(GtkWidget      *widget,
     x_translated = ui_translate_x(x);
     y_translated = ui_translate_y(y);
 
-    if (event->button == 1 && mode == TEXT) {
+    if (event->button == 1 && ui_get_mode() == TEXT) {
         text_x = x_translated;
         text_y = y_translated;
 
@@ -612,8 +601,30 @@ static void area_clicked_on(GtkWidget      *widget,
             gtk_widget_show(GTK_WIDGET(text_dialog));
         }
     }
+    if (event->button == 1 && ui_get_mode() == BRUSH) {
+        if ((event->type & GDK_BUTTON_PRESS_MASK) != 0) {
+            printf("rel\n");
+        }
+        if ((event->type & GDK_BUTTON_RELEASE_MASK) != 0) {
+            printf("norel\n");
+        }
+    }
     update_drawing_area();
     // TODO: on single click draw dot
+}
+
+static void update_color_buttons()
+{
+    gtk_color_chooser_set_rgba(color_picker_primary, ui_get_color1());
+    gtk_color_chooser_set_rgba(color_picker_secondary, ui_get_color2());
+}
+
+static void update_toggle_buttons()
+{
+    Mode mode = ui_get_mode();
+    gtk_toggle_button_set_active(text_toggle, mode == TEXT);
+    gtk_toggle_button_set_active(eraser_toggle, mode == ERASER);
+    gtk_toggle_button_set_active(brush_toggle, mode == BRUSH);
 }
 
 // global keybinds
@@ -623,11 +634,13 @@ static void my_key_press(GtkWidget *widget,
 {
     config_perform_event(event);
     update_drawing_area();
+    update_toggle_buttons();
+    update_color_buttons();
     set_title_saved(pix_is_saved());
 }
 
 // build the gtk ui and connects all signals
-extern int build_gui(gboolean is_on_top, 
+extern int gui_init(gboolean is_on_top, 
                     gboolean is_maximized)
 {
     GtkBuilder *builder; 
@@ -637,8 +650,6 @@ extern int build_gui(gboolean is_on_top,
               *undo_all_button, *fit_zoom_button, *about_button,
               *save_button, *save_as_button, *open_button, *shortcuts_button;
     GtkButton *color_switch_button, *text_dialog_ok, *text_dialog_cancel;
-    GtkColorChooser *color_picker_primary;
-    GtkColorChooser *color_picker_secondary;
     GtkTextBuffer *textbuffer;
     GtkFontButton *font_button;
     GtkWidget *popover, *about_dialog, *shortcuts_dialog;
@@ -697,14 +708,12 @@ extern int build_gui(gboolean is_on_top,
                     G_CALLBACK(change_color2), NULL);
     color_switch_button = GTK_BUTTON(gtk_builder_get_object(builder, "color_switch"));
     g_signal_connect(G_OBJECT(color_switch_button), "pressed", 
-                    G_CALLBACK(switch_colors), NULL);
+                    G_CALLBACK(ui_switch_colors), NULL);
     g_signal_connect(G_OBJECT(color_switch_button), "pressed", 
                     G_CALLBACK(update_color_primary), (gpointer) color_picker_primary);
     g_signal_connect(G_OBJECT(color_switch_button), "pressed", 
                     G_CALLBACK(update_color_secondary), (gpointer) color_picker_secondary);
 
-    gtk_color_chooser_get_rgba(color_picker_primary, &color1);
-    gtk_color_chooser_get_rgba(color_picker_secondary, &color2);
 
     // modi toggle buttons
 
@@ -718,10 +727,6 @@ extern int build_gui(gboolean is_on_top,
                     G_CALLBACK(update_on_eraser_toggle), NULL);
     g_signal_connect(G_OBJECT(text_toggle), "toggled", 
                     G_CALLBACK(update_on_text_toggle), NULL);
-
-    gtk_toggle_button_set_active(brush_toggle, TRUE);
-    gtk_toggle_button_set_active(eraser_toggle, FALSE);
-    gtk_toggle_button_set_active(text_toggle, FALSE);
 
     // text dialog
     text_dialog = GTK_DIALOG(gtk_builder_get_object(builder, "text_dialog"));
@@ -807,10 +812,12 @@ extern int build_gui(gboolean is_on_top,
     set_title_saved(FALSE);
     ui_state_init();
     update_drawing_area();
+    update_color_buttons();
+    update_toggle_buttons();
     fit_zoom();
     font_desc = gtk_font_chooser_get_font_desc(GTK_FONT_CHOOSER(font_button));
 
-    brush_action.color = &color1;
+    brush_action.color = ui_get_color1();
     brush_action.positions = coords;
     brush_action.width = radius;
 
@@ -819,6 +826,6 @@ extern int build_gui(gboolean is_on_top,
     erase_action.width = radius;
 
     text_action.font = font_desc;
-    text_action.color = &color1;
-    return 0;
+    text_action.color = ui_get_color1();
+    return 1;
 }

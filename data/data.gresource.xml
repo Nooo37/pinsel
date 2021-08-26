@@ -2,7 +2,7 @@
 <gresources>
   <gresource prefix="">
     <file preprocess="xml-stripblanks">data/window.ui</file>
-    <file preprocess="xml-stripblanks">data/shortcuts.ui</file>
+    <file>data/pinsel.lua</file>
     <file>data/help.txt</file>
   </gresource>
 </gresources>

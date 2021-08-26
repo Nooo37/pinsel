@@ -1,7 +1,9 @@
 #include <gtk/gtk.h>
 #include <gio/gunixoutputstream.h>
 #include <gio/gunixinputstream.h>
+#include <stdlib.h>
 
+#include "gio/gmenumodel.h"
 #include "pinsel.h"
 #include "config.h"
 #include "pixbuf.h"
@@ -15,9 +17,6 @@ int main(int argc, char *argv[])
     gchar *init_dest = NULL;
     GdkPixbuf *init_pix = NULL;
 
-    if (config_init())
-        return 1;
-
     // read image from stdin if something is being piped into the app
     if (isatty(0) != 1) {
         GError *err = NULL;
@@ -29,6 +28,19 @@ int main(int argc, char *argv[])
             return 1;
         }
     }
+
+    char* config_file_location = "init.lua";
+    /* if (getenv("XDG_CONFIG_HOME")) */
+    /*     config_file_location = getenv("XDG_CONFIG_HOME"); */
+    /* else if (getenv("HOME")) { */
+    /*     char *home_dir = getenv("HOME"); */
+    /*     config_file_location = g_strdup_printf("%s%s", home_dir, ".config"); */
+    /* } */
+    /* config_file_location = g_strdup_printf("%s/pinsel/init.lua", config_file_location); */
+        
+    if (!config_init(config_file_location))
+        return 1;
+
 
     // handle all the other command line arguments
     for (int i = 1; i < argc; i++) {
@@ -88,7 +100,7 @@ int main(int argc, char *argv[])
 
     gtk_init(&argc, &argv);
 
-    if (build_gui(is_on_top, is_maximized))
+    if (!gui_init(is_on_top, is_maximized))
         return 1;
 
     gtk_main();

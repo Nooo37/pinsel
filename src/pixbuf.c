@@ -100,11 +100,21 @@ extern void pix_set_dest(char* new_dest)
 
 extern gboolean pix_save()
 {
-    // TODO: error handling, get format by the destintation file name
+    // TODO: , get format by the destintation file name
     // char* format = get_format_by_filename(dest);
-    gdk_pixbuf_save(pix_get_current(), dest, "png", NULL, NULL);
-    is_saved = TRUE;
-    return TRUE;
+    if (dest != NULL) {
+        GError *err = NULL;
+        gdk_pixbuf_save(pix_get_current(), dest, "png", &err, NULL);
+        if (err) {
+            fprintf(stderr, "Failed to save image:\n%s\n", err->message);
+            is_saved = TRUE;
+            g_error_free(err);
+            return FALSE;
+        } else {
+            return TRUE;
+        }
+    }
+    return FALSE;
 }
 
 extern void pix_load_new_image(char* filename)

@@ -1,3 +1,6 @@
+#ifndef UI_STATE_H
+#define UI_STATE_H
+
 #include <gtk/gtk.h>
 
 #include "pixbuf.h"
@@ -44,3 +47,14 @@ extern int ui_get_area_width();
 
 extern void ui_perform_action(Action* action);
 
+extern Mode ui_get_mode();
+
+extern void ui_set_mode(Mode mode);
+
+extern GdkRGBA* ui_get_color1();
+
+extern GdkRGBA* ui_get_color2();
+
+extern void ui_switch_colors();
+
+#endif
