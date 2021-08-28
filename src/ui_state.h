@@ -57,4 +57,8 @@ extern GdkRGBA* ui_get_color2();
 
 extern void ui_switch_colors();
 
+extern void ui_set_width(int new_width);
+
+extern int ui_get_width();
+
 #endif

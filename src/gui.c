@@ -30,7 +30,7 @@ GtkColorChooser *color_picker_secondary;
 GtkAdjustment *radius_scale;
 
 // brush settings
-int radius = 10;
+/* int radius = 10; */
 GList *coords = NULL;
 coord_t *start_line = NULL;
 
@@ -112,179 +112,6 @@ static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
     return mods;
 }
 
-static gint motion_notify_event( GtkWidget *widget,
-                                 GdkEventMotion *event )
-{
-    int x, y, x_translated, y_translated;
-    GdkModifierType state;
-
-    // get coords
-    if (event->is_hint) {
-        gdk_window_get_device_position (event->window, device, &x, &y, &state);
-    } else {
-        x = event->x;
-        y = event->y;
-        state = event->state;
-    }
-
-    x_translated = ui_translate_x(x);
-    y_translated = ui_translate_y(y);
-
-    Modifiers mod = convert_gdk_to_modifiers(state);
-    config_perform_motion_event(x_translated, y_translated, mod);
-
-    // do a line when holding shift and moving the mouse in brush mode
-    if ((state & GDK_BUTTON1_MASK) && (state & GDK_SHIFT_MASK) && ui_get_mode() == BRUSH) {
-        if (activity == LINING) {
-            coord_t* temp = g_new(coord_t, 1);
-            temp->x = x_translated;
-            temp->y = y_translated;
-            coords = g_list_append(coords, start_line);
-            coords = g_list_append(coords, temp);
-
-            brush_action.width = radius;
-            brush_action.positions = coords;
-
-            Action temp_action;
-            temp_action.type = BRUSH_ACTION;
-            temp_action.brush = &brush_action;
-
-            pix_perform_action(&temp_action);
-            g_free(temp);
-            g_list_free(coords);
-            coords = NULL;
-        } else {
-            activity = LINING;
-            start_line = g_new(coord_t, 1);
-            start_line->x = x_translated;
-            start_line->y = y_translated;
-        }
-        return TRUE;
-    } else {
-        if (activity == LINING) {
-            coord_t* temp = g_new(coord_t, 1);
-            temp->x = x_translated;
-            temp->y = y_translated;
-            coords = g_list_append(coords, start_line);
-            coords = g_list_append(coords, temp);
-
-            brush_action.width = radius;
-            brush_action.positions = coords;
-
-            Action temp_action;
-            temp_action.type = BRUSH_ACTION;
-            temp_action.brush = &brush_action;
-
-            pix_perform_action(&temp_action);
-            g_free(temp);
-            g_list_free(coords);
-            g_free(start_line);
-            config_perform_self_contained_action(APPLY);
-            coords = NULL;
-            activity = IDLE;
-            return TRUE;
-        }
-    }
-
-    // strokes drawing
-    if ((state & GDK_BUTTON1_MASK && ui_get_mode() == BRUSH) ||
-                    ((state & GDK_BUTTON3_MASK && ui_get_mode() == ERASER))) {
-        if (activity == BRUSHING) {
-            coord_t* temp = g_new(coord_t, 1);
-            temp->x = x_translated;
-            temp->y = y_translated;
-            coords = g_list_append(coords, temp);
-
-            brush_action.width = radius;
-            brush_action.positions = coords;
-
-            Action temp_action;
-            temp_action.type = BRUSH_ACTION;
-            temp_action.brush = &brush_action;
-
-            pix_perform_action(&temp_action);
-        } else {
-            activity = BRUSHING;
-        }
-    } else {
-        if (activity == BRUSHING) {
-            brush_action.width = radius;
-            brush_action.positions = coords;
-
-            Action temp_action;
-            temp_action.type = BRUSH_ACTION;
-            temp_action.brush = &brush_action;
-
-            pix_perform_action(&temp_action);
-            g_list_free_full(coords, g_free);
-            config_perform_self_contained_action(APPLY);
-            coords = NULL;
-            activity = IDLE;
-        }
-    }
-
-    // strokes erase
-    if ((state & GDK_BUTTON3_MASK && ui_get_mode() == BRUSH) ||
-                    ((state & GDK_BUTTON1_MASK && ui_get_mode() == ERASER))) {
-        if (activity == ERASING) {
-            coord_t* temp = g_new(coord_t, 1);
-            temp->x = x_translated;
-            temp->y = y_translated;
-            coords = g_list_append(coords, temp);
-
-            EraseAction my_erase_action;
-            my_erase_action.width = radius;
-            my_erase_action.positions = coords;
-            my_erase_action.alpha = 1;
-
-            Action temp_action;
-            temp_action.type = ERASE_ACTION;
-            temp_action.erase = &my_erase_action;
-
-            pix_perform_action(&temp_action);
-        } else {
-            activity = ERASING;
-        }
-    } else {
-        if (activity == ERASING) {
-            EraseAction my_erase_action;
-            my_erase_action.width = radius;
-            my_erase_action.positions = coords;
-            my_erase_action.alpha = 1;
-
-            Action temp_action;
-            temp_action.type = ERASE_ACTION;
-            temp_action.erase = &my_erase_action;
-
-            pix_perform_action(&temp_action);
-            g_list_free_full(coords, g_free);
-            config_perform_self_contained_action(APPLY);
-            coords = NULL;
-            activity = IDLE;
-        }
-    }
-
-    // image dragging
-    if (state & GDK_BUTTON2_MASK) {
-        if (activity == DRAGGING) {
-            ui_set_offset_x(offset_old_x - (dragstart_x - x));
-            ui_set_offset_y(offset_old_y - (dragstart_y - y));
-        } else {
-            activity = DRAGGING;
-            offset_old_x = ui_get_offset_x();
-            offset_old_y = ui_get_offset_y();
-            dragstart_x = x;
-            dragstart_y = y;
-        }
-    } else {
-        if (activity == DRAGGING)
-            activity = IDLE;
-    }
-
-    update_drawing_area();
-    return TRUE;
-}
-
 void temporary_text_display()
 {
     TextAction temp_text_action;
@@ -300,9 +127,9 @@ void temporary_text_display()
     update_drawing_area();
 }
 
-static gboolean on_draw (GtkWidget *da, 
-                         cairo_t *cr, 
-                         gpointer data)
+static gboolean on_draw(GtkWidget *da, 
+                        cairo_t *cr, 
+                        gpointer data)
 {
     update_drawing_area();
     return FALSE;
@@ -468,7 +295,7 @@ static void on_font_set(GtkFontButton* button, gpointer user_data)
 
 static void change_radius(GtkAdjustment *adjust)
 {
-    radius = gtk_adjustment_get_value(adjust);
+    ui_set_width(gtk_adjustment_get_value(adjust));
 }
 
 static void undo()
@@ -578,8 +405,8 @@ static void update_toggle_buttons()
     gtk_toggle_button_set_active(brush_toggle, mode == BRUSH);
 }
 
-static void area_clicked_on(GtkWidget      *widget,
-                            GdkEventButton *event)
+static gboolean on_click(GtkWidget      *widget,
+                         GdkEventButton *event)
 {
     int x, y, x_translated, y_translated;
 
@@ -591,8 +418,33 @@ static void area_clicked_on(GtkWidget      *widget,
     Modifiers mod = convert_gdk_to_modifiers(event->state);
     config_perform_click_event(event->button, x_translated, y_translated, mod);
     update_drawing_area();
+    return TRUE;
 }
 
+static gboolean on_motion(GtkWidget *widget,
+                          GdkEventMotion *event)
+{
+    int x, y, x_translated, y_translated;
+    GdkModifierType state;
+
+    // get coords
+    if (event->is_hint) {
+        gdk_window_get_device_position (event->window, device, &x, &y, &state);
+    } else {
+        x = event->x;
+        y = event->y;
+        state = event->state;
+    }
+
+    x_translated = ui_translate_x(x);
+    y_translated = ui_translate_y(y);
+
+    Modifiers mod = convert_gdk_to_modifiers(state);
+    config_perform_motion_event(x_translated, y_translated, mod);
+
+    update_drawing_area();
+    return TRUE;
+}
 
 static gboolean on_scroll(GtkWidget *widget,
                           GdkEventScroll *event,
@@ -607,9 +459,9 @@ static gboolean on_scroll(GtkWidget *widget,
     return TRUE;
 }
 
-static void on_key(GtkWidget *widget,
-                   GdkEventKey *event,
-                   gpointer user_data)
+static gboolean on_key(GtkWidget *widget,
+                       GdkEventKey *event,
+                       gpointer user_data)
 {
     char key[0];
     key[0] = (char) event->keyval;
@@ -619,6 +471,7 @@ static void on_key(GtkWidget *widget,
     update_toggle_buttons();
     update_color_buttons();
     set_title_saved(pix_is_saved());
+    return TRUE;
 }
 
 // build the gtk ui and connects all signals
@@ -660,9 +513,9 @@ extern int gui_init(gboolean is_on_top,
     g_signal_connect(G_OBJECT(canvas), "draw", 
                     G_CALLBACK(on_draw), NULL);
     g_signal_connect (G_OBJECT(canvas), "motion_notify_event", 
-                    G_CALLBACK(motion_notify_event), NULL);
+                    G_CALLBACK(on_motion), NULL);
     g_signal_connect (G_OBJECT(canvas), "button_press_event", 
-                    G_CALLBACK(area_clicked_on), NULL);
+                    G_CALLBACK(on_click), NULL);
     g_signal_connect (G_OBJECT(canvas), "scroll-event", 
                     G_CALLBACK(on_scroll), NULL);
 
@@ -801,11 +654,11 @@ extern int gui_init(gboolean is_on_top,
 
     brush_action.color = ui_get_color1();
     brush_action.positions = coords;
-    brush_action.width = radius;
+    brush_action.width = ui_get_width();
 
     erase_action.positions = coords;
-    erase_action.alpha = 1;
-    erase_action.width = radius;
+    erase_action.alpha = ui_get_width();
+    erase_action.width = ui_get_width();
 
     text_action.font = font_desc;
     text_action.color = ui_get_color1();

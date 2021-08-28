@@ -17,6 +17,12 @@ static void copy_pix_to_displayed()
     displayed = gdk_pixbuf_copy(draw_layer);
 }
 
+static void copy_displayed_to_pix()
+{
+    g_object_unref(draw_layer);
+    draw_layer = gdk_pixbuf_copy(displayed);
+}
+
 static void update_geo()
 {
     width = gdk_pixbuf_get_width(draw_layer);
@@ -124,13 +130,12 @@ extern void pix_load_new_image(char* filename)
 
 extern void pix_perform_action(Action *action)
 {
+    /* early return means: do not put the current state into history */
     switch (action->type) {
         case APPLY: {
-                g_object_unref(draw_layer);
-                draw_layer = gdk_pixbuf_copy(displayed);
+                copy_displayed_to_pix();
             } break;
         case DISCARD: {
-                g_object_unref(displayed);
                 copy_pix_to_displayed();
                 return;
             } break;
@@ -227,9 +232,7 @@ extern void pix_perform_action(Action *action)
         default:
             return;
     }
-    GdkPixbuf *temp = pix_get_current();
-    history_add_one(temp);
-    g_object_unref(temp);
+    history_add_one(draw_layer);
     is_saved = FALSE;
 }
 

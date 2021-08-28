@@ -9,6 +9,7 @@ static UIGeometry geo;
 static Mode mode;
 GdkRGBA color1; // primary color
 GdkRGBA color2; // secondary color
+int width;
 
 extern void ui_state_init()
 {
@@ -121,6 +122,16 @@ extern void ui_switch_colors()
     temp = color1;
     color1 = color2;
     color2 = temp;
+}
+
+extern void ui_set_width(int new_width)
+{
+    width = new_width;
+}
+
+extern int ui_get_width()
+{
+    return width;
 }
 
 extern void ui_perform_action(Action* action)

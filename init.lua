@@ -2,7 +2,7 @@ local pinsel = pinsel
 local BRUSH_MODE, ERASER_MODE, TEXT_MODE = BRUSH_MODE, ERASER_MODE, TEXT_MODE
 
 local DELTA = 10
-local ZOOM = 0.4
+local ZOOM = 0.1
 
 local temp_keys, keys, mode_keys
 
@@ -23,7 +23,7 @@ keys = {
     { "i",   function() pinsel.rotate(true) end,  "Manipulation", "rotate counterclockwise" },
     { "y",   function() pinsel.flip(false) end,   "Manipulation", "flip horizontally" },
     { "o",   function() pinsel.flip(true) end,    "Manipulation", "flip vertically" },
-    { "a",   function () pinsel.set_color1(math.random(), math.random(), math.random(), 1) end, "GUI", "make the current color black" },
+    { "a",   function() pinsel.set_color1(math.random(), math.random(), math.random(), 1) end, "GUI", "make the current color black" },
     { "s",   pinsel.switch_colors, "GUI", "switch the two colors" },
     { "C-t", function() temp_keys = keys; keys = mode_keys end, "GUI", "modal binding for modes" },
     { "M-x", pinsel.undo_all, "History", "undo all changes" },
@@ -48,10 +48,65 @@ pinsel.on_click = function(b, x, y, mod)
     -- print(b, x, y, mod.control)
 end
 
+local activity = "idle"
+
+local function is_brush(mod)
+    local mode = pinsel.get_mode()
+    return (mode == BRUSH_MODE and mod.button1) or
+           (mode == ERASER_MODE and mod.button3)
+end
+local function is_erase(mod)
+    local mode = pinsel.get_mode()
+    return (mode == BRUSH_MODE and mod.button3) or
+           (mode == ERASER_MODE and mod.button1)
+end
+local function is_drag(mod) return mod.button2 end
+local x_start, y_start
+
 pinsel.on_motion = function(x, y, mod)
-    print(x, y, mod.button1)
+    if is_brush(mod) then activity = "brush" end
+    if is_erase(mod) then activity = "erase" end
+
+    if activity == "brush" then
+        if is_brush(mod) then
+            pinsel.discard()
+            pinsel.path_add(x, y)
+            pinsel.draw()
+        else
+            pinsel.discard()
+            pinsel.draw()
+            pinsel.apply()
+            pinsel.path_clear()
+            activity = "idle"
+        end
+    end
+
+    if activity == "erase" then
+        if is_erase(mod) then
+            pinsel.discard()
+            pinsel.path_add(x, y)
+            pinsel.erase()
+        else
+            pinsel.discard()
+            pinsel.erase()
+            pinsel.apply()
+            pinsel.path_clear()
+            activity = "idle"
+        end
+    end
+
+    if is_drag(mod) then
+        if activity == "drag" then
+            pinsel.move(x - x_start, y - y_start)
+        else
+            x_start = x
+            y_start = y
+            activity = "drag"
+        end
+    end
 end
 
 pinsel.set_color1(0, 0, 0, 1)
 pinsel.set_color2(0.5, 0, 0, 0.5)
+pinsel.set_width(20)
 
