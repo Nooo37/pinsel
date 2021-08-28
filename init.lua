@@ -18,8 +18,8 @@ keys = {
     { "l",   function() pinsel.move( - DELTA,       0 ) end, "Navigation", "move right" },
     { "j",   function() pinsel.move(       0, - DELTA ) end, "Navigation", "move down" },
     { "k",   function() pinsel.move(       0,   DELTA ) end, "Navigation", "move up" },
-    { "C-m", function() pinsel.zoom( ZOOM) end,              "Navigation", "zoom in" },
-    { "C-n", function() pinsel.zoom(-ZOOM) end,              "Navigation", "zoom out" },
+    { "scroll_up", function() pinsel.zoom( ZOOM) end,              "Navigation", "zoom in" },
+    { "scroll_down", function() pinsel.zoom(-ZOOM) end,              "Navigation", "zoom out" },
     { "u",   function() pinsel.rotate(false) end, "Manipulation", "rotate clockwise" },
     { "i",   function() pinsel.rotate(true) end,  "Manipulation", "rotate counterclockwise" },
     { "y",   function() pinsel.flip(false) end,   "Manipulation", "flip horizontally" },
@@ -41,7 +41,6 @@ pinsel.on_key = function(key, mod)
     if mod.alt then key = "M-" .. key end
     if mod.control then key = "C-" .. key end
     for _, k in ipairs(keys) do
-        print(key, k[1])
         if k[1] == key then k[2]() end
     end
 end

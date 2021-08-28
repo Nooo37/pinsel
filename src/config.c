@@ -237,6 +237,8 @@ extern int config_init(char* config_file)
     lua_newtable(L);
 
     static const luaL_Reg l[] = {
+        /* { "discard",       config_zoom }, */
+        /* { "flush",       config_zoom }, */
         { "zoom",       config_zoom },
         { "rotate",     config_rotate},
         { "flip",       config_flip},

@@ -563,23 +563,6 @@ static void open_shortcuts_dialog(GtkWidget *temp, gpointer shortcuts_dialog)
     g_object_unref(builder);
 }
 
-// connect to that to get scale on mouse scrolling
-static gboolean mouse_scroll( GtkWidget *widget,
-                              GdkEventScroll *event,
-                              gpointer data) 
-{
-    if (event->direction == GDK_SCROLL_UP && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
-        increase_radius();
-    else if (event->direction == GDK_SCROLL_DOWN && (event->state & GDK_CONTROL_MASK) && (event->state & GDK_MOD1_MASK))
-        decrease_radius();
-    else if (event->direction == GDK_SCROLL_UP)
-        ui_set_scale(ui_get_scale() + DELTA_ZOOM);
-    else if (event->direction == GDK_SCROLL_DOWN)
-        ui_set_scale(ui_get_scale() - DELTA_ZOOM);
-    update_drawing_area();
-    return TRUE;
-}
-
 static void area_clicked_on(GtkWidget      *widget,
                             GdkEventButton *event)
 {
@@ -639,10 +622,22 @@ static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
     return mods;
 }
 
-// global keybinds
-static void my_key_press(GtkWidget *widget,
-                         GdkEventKey *event,
-                         gpointer user_data) 
+static gboolean on_scroll(GtkWidget *widget,
+                          GdkEventScroll *event,
+                          gpointer data)
+{
+    Modifiers mod = convert_gdk_to_modifiers(event->state);
+    if (event->direction == GDK_SCROLL_UP)
+        config_perform_key_event("scroll_up", mod);
+    else if (event->direction == GDK_SCROLL_DOWN)
+        config_perform_key_event("scroll_down", mod);
+    update_drawing_area();
+    return TRUE;
+}
+
+static void on_key(GtkWidget *widget,
+                   GdkEventKey *event,
+                   gpointer user_data)
 {
     char key[0];
     key[0] = (char) event->keyval;
@@ -683,7 +678,7 @@ extern int gui_init(gboolean is_on_top,
     g_signal_connect(G_OBJECT(window), "destroy", 
                     G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(G_OBJECT(window), "key-press-event", 
-                    G_CALLBACK(my_key_press), NULL);
+                    G_CALLBACK(on_key), NULL);
 
     gtk_widget_add_events(window, GDK_KEY_PRESS_MASK
                     | GDK_KEY_RELEASE_MASK);
@@ -697,7 +692,7 @@ extern int gui_init(gboolean is_on_top,
     g_signal_connect (G_OBJECT(canvas), "button_press_event", 
                     G_CALLBACK(area_clicked_on), NULL);
     g_signal_connect (G_OBJECT(canvas), "scroll-event", 
-                    G_CALLBACK(mouse_scroll), NULL);
+                    G_CALLBACK(on_scroll), NULL);
 
     gtk_widget_set_events (canvas, GDK_EXPOSURE_MASK
                        | GDK_LEAVE_NOTIFY_MASK

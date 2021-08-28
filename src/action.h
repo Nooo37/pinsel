@@ -34,6 +34,8 @@ typedef struct {
 
 typedef enum {
     // pixbuf related actions
+    DISCARD,
+    APPLY,
     BRUSH_ACTION,
     ERASE_ACTION,
     TEXT_ACTION,
