@@ -26,4 +26,16 @@ extern void config_perform_motion_event(int x, int y, Modifiers mod);
 
 extern char* config_get_shortcut_ui();
 
+extern void config_notify_text(char* new_text);
+
+extern void config_notify_text_close(gboolean accepted_changes);
+
+/* extern void config_notify_color1(float r, float g, float b, float a); */
+/*  */
+/* extern void config_notify_color2(float r, float g, float b, float a); */
+/*  */
+/* extern void config_notify_mode(Mode new_mode); */
+
+extern int config_get_history_limit();
+
 #endif

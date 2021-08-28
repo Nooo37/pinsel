@@ -45,6 +45,7 @@ typedef enum {
     UNDO_ALL,
     SAVE,
     // ui related actions
+    TEXT_INPUT,
     SWITCH_COLORS,
     SET_COLOR1,
     SET_COLOR2,

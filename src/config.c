@@ -19,6 +19,7 @@ extern void config_perform_action(Action *action)
         case ZOOM: case MOVE_HORIZONTALLY: case MOVE_VERTICALLY:
         case FIT_POSITION: case QUIT_UNSAFE: case SAVE_AS: case OPEN:
         case SWITCH_MODE: case SWITCH_COLORS: case SET_COLOR1: case SET_COLOR2:
+        case TEXT_INPUT:
             ui_perform_action(action);
         default:
             pix_perform_action(action);
@@ -53,6 +54,12 @@ static int config_move(lua_State *L)
     temp.type = MOVE_HORIZONTALLY;
     temp.move = delta_y;
     config_perform_action(&temp);
+    return 1;
+}
+
+static int config_text_input(lua_State *L)
+{
+    config_perform_self_contained_action(TEXT_INPUT);
     return 1;
 }
 
@@ -208,6 +215,24 @@ static int config_path_clear(lua_State *L)
     return 1;
 }
 
+static int config_text(lua_State *L)
+{
+    const char* text = luaL_checkstring(L, 1);
+    int x = luaL_checknumber(L, 2);
+    int y = luaL_checknumber(L, 3);
+    TextAction ta;
+    ta.color = ui_get_color1();
+    ta.font = ui_get_font();
+    ta.text = text;
+    ta.x = x;
+    ta.y = y;
+    Action action;
+    action.type = TEXT_ACTION;
+    action.text = &ta;
+    config_perform_action(&action);
+    return 1;
+}
+
 static int config_draw(lua_State *L)
 {
     BrushAction da;
@@ -262,6 +287,7 @@ extern int config_init(char* config_file)
         { "path_clear", config_path_clear },
         { "path_add",   config_path_add },
         { "draw",       config_draw },
+        { "text",       config_text },
         { "erase",      config_erase },
         { "zoom",       config_zoom },
         { "rotate",     config_rotate},
@@ -278,6 +304,7 @@ extern int config_init(char* config_file)
         { "set_width",  config_set_width },
         { "set_color1", config_set_color1 },
         { "set_color2", config_set_color2 },
+        { "open_text_input",   config_text_input },
         { "switch_colors", config_switch_colors },
         /* to be removed */
         { "get_mode", config_get_mode },
@@ -311,6 +338,30 @@ extern int config_init(char* config_file)
     return 1;
 }
 
+extern void config_notify_text(char* new_text)
+{
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel");
+    lua_pushstring(L, "on_text_change");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, -1))
+        return;
+    lua_pushstring(L, new_text);
+    lua_call(L, 1, 0);
+}
+
+extern void config_notify_text_close(gboolean accepted_changes)
+{
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel");
+    lua_pushstring(L, "on_text_close");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, -1))
+        return;
+    lua_pushboolean(L, accepted_changes);
+    lua_call(L, 1, 0);
+}
+
 /* pushes a table with every modifier as fields on top of the stack */
 static void push_modifier_table(Modifiers mod)
 {
@@ -341,7 +392,7 @@ extern void config_perform_key_event(char *key, Modifiers mod)
     lua_getglobal(L, "pinsel");
     lua_pushstring(L, "on_key");
     lua_gettable(L, -2);
-    if (lua_isnil(L, 1))
+    if (lua_isnil(L, -1))
         return;
     lua_pushstring(L, key);
     push_modifier_table(mod);
@@ -355,7 +406,7 @@ extern void config_perform_click_event(int button, int x, int y, Modifiers mod)
     lua_getglobal(L, "pinsel");
     lua_pushstring(L, "on_click");
     lua_gettable(L, -2);
-    if (lua_isnil(L, 1))
+    if (lua_isnil(L, -1))
         return;
     lua_pushnumber(L, button);
     lua_pushnumber(L, x);
@@ -371,11 +422,20 @@ extern void config_perform_motion_event(int x, int y, Modifiers mod)
     lua_getglobal(L, "pinsel");
     lua_pushstring(L, "on_motion");
     lua_gettable(L, -2);
-    if (lua_isnil(L, 1))
+    if (lua_isnil(L, -1))
         return;
     lua_pushnumber(L, x);
     lua_pushnumber(L, y);
     push_modifier_table(mod);
     lua_call(L, 3, 0);
     lua_pop(L, 1);
+}
+
+extern int config_get_history_limit()
+{
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel");
+    lua_pushstring(L, "history_limit");
+    lua_gettable(L, -2);
+    return luaL_checknumber(L, -1);
 }

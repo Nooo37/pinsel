@@ -44,11 +44,9 @@ int offset_old_y = 0;
 gchar *text = "";
 int text_x = 20;
 int text_y = 20;
-PangoFontDescription *font_desc;
+/* PangoFontDescription *font_desc; */
 
 // actions
-BrushAction brush_action;
-EraseAction erase_action;
 TextAction text_action;
 
 
@@ -112,21 +110,6 @@ static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
     return mods;
 }
 
-void temporary_text_display()
-{
-    TextAction temp_text_action;
-    temp_text_action.text = text;
-    temp_text_action.font = font_desc;
-    temp_text_action.color = ui_get_color1();
-    temp_text_action.x = text_x;
-    temp_text_action.y = text_y;
-    Action temp_action;
-    temp_action.type = TEXT_ACTION;
-    temp_action.text = &temp_text_action;
-    pix_perform_action(&temp_action);
-    update_drawing_area();
-}
-
 static gboolean on_draw(GtkWidget *da, 
                         cairo_t *cr, 
                         gpointer data)
@@ -182,32 +165,17 @@ static void rotate_right()
     update_drawing_area();
 }
 
-static void quit_text()
-{
-    activity = IDLE;
-    gtk_widget_hide((GtkWidget*) text_dialog);
-}
-
 static void quit_text_tool_ok()
 {
-    quit_text();
-    TextAction temp_text_action;
-    temp_text_action.text = text;
-    temp_text_action.font = font_desc;
-    temp_text_action.color = ui_get_color1();
-    temp_text_action.x = text_x;
-    temp_text_action.y = text_y;
-    Action temp_action;
-    temp_action.type = TEXT_ACTION;
-    temp_action.text = &temp_text_action;
-    pix_perform_action(&temp_action);
+    gtk_widget_hide((GtkWidget*) text_dialog);
+    config_notify_text_close(TRUE);
     update_drawing_area();
 }
 
 static void quit_text_tool_cancel()
 {
-    quit_text();
-    pix_undo_temrporarily_action();
+    gtk_widget_hide((GtkWidget*) text_dialog);
+    config_notify_text_close(FALSE);
     update_drawing_area();
 }
 
@@ -283,14 +251,14 @@ static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
     GtkTextIter start, end;
 
     gtk_text_buffer_get_bounds(textbuffer, &start, &end);
-    text = gtk_text_buffer_get_text(textbuffer, &start, &end, TRUE);
-    temporary_text_display();
+    ui_set_text(gtk_text_buffer_get_text(textbuffer, &start, &end, TRUE));
+    update_drawing_area();
 }
 
 static void on_font_set(GtkFontButton* button, gpointer user_data)
 {
-    font_desc = gtk_font_chooser_get_font_desc((GtkFontChooser*) button);
-    temporary_text_display();
+    ui_set_font(gtk_font_chooser_get_font_desc((GtkFontChooser*) button));
+    update_drawing_area();
 }
 
 static void change_radius(GtkAdjustment *adjust)
@@ -362,6 +330,11 @@ extern void gui_open_new_image()
     }
     
     gtk_widget_destroy (dialog);
+}
+
+extern void gui_open_text_dialog()
+{
+    gtk_widget_show(GTK_WIDGET(text_dialog));
 }
 
 
@@ -650,17 +623,9 @@ extern int gui_init(gboolean is_on_top,
     update_color_buttons();
     update_toggle_buttons();
     fit_zoom();
-    font_desc = gtk_font_chooser_get_font_desc(GTK_FONT_CHOOSER(font_button));
+    ui_set_font(gtk_font_chooser_get_font_desc(GTK_FONT_CHOOSER(font_button)));
 
-    brush_action.color = ui_get_color1();
-    brush_action.positions = coords;
-    brush_action.width = ui_get_width();
-
-    erase_action.positions = coords;
-    erase_action.alpha = ui_get_width();
-    erase_action.width = ui_get_width();
-
-    text_action.font = font_desc;
+    text_action.font = ui_get_font();
     text_action.color = ui_get_color1();
     return 1;
 }

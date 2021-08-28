@@ -1,7 +1,6 @@
 #include <gtk/gtk.h>
 
 #include "action.h"
-#include "draw.h"
 #include "history.h"
 
 static GdkPixbuf *draw_layer;
@@ -9,7 +8,7 @@ static GdkPixbuf *displayed;
 static GdkPixbuf *original;
 static char* dest = NULL;
 static gboolean is_saved = FALSE;
-static int width, height;
+static int width, height, history_limit;
 
 static void copy_pix_to_displayed()
 {
@@ -29,13 +28,14 @@ static void update_geo()
     height = gdk_pixbuf_get_height(draw_layer);
 }
 
-extern void pix_init(GdkPixbuf *temp)
+extern void pix_init(GdkPixbuf *temp, int limit)
 {
     displayed = gdk_pixbuf_copy(temp);
     original = gdk_pixbuf_copy(temp);
     draw_layer = gdk_pixbuf_copy(temp);
+    history_limit = limit;
     update_geo();
-    history_init(draw_layer);
+    history_init(draw_layer, limit);
 }
 
 extern gboolean pix_has_undo()
@@ -123,7 +123,7 @@ extern void pix_load_new_image(char* filename)
         return;
     }
     history_free();
-    pix_init(temp);
+    pix_init(temp, history_limit);
     pix_set_dest(filename);
     g_object_unref(temp);
 }

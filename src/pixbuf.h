@@ -5,7 +5,7 @@
 
 #include "action.h"
 
-extern void pix_init(GdkPixbuf *temp);
+extern void pix_init(GdkPixbuf *temp, int history_limit);
 
 extern GdkPixbuf* pix_get_original();
 

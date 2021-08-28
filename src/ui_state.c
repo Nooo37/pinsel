@@ -1,5 +1,6 @@
 #include <gtk/gtk.h>
 
+#include "config.h"
 #include "ui_state.h"
 #include "gui.h"
 #include "pinsel.h"
@@ -7,9 +8,11 @@
 
 static UIGeometry geo;
 static Mode mode;
-GdkRGBA color1; // primary color
-GdkRGBA color2; // secondary color
-int width;
+static GdkRGBA color1; // primary color
+static GdkRGBA color2; // secondary color
+static int width;
+static PangoFontDescription *font_desc;
+static char* text;
 
 extern void ui_state_init()
 {
@@ -134,6 +137,27 @@ extern int ui_get_width()
     return width;
 }
 
+extern void ui_set_text(char* new_text)
+{
+    config_notify_text(new_text);
+    text = new_text;
+}
+
+extern char* ui_get_text()
+{
+    return text;
+}
+
+extern PangoFontDescription* ui_get_font()
+{
+    return font_desc;
+}
+
+extern void ui_set_font(PangoFontDescription *new_font)
+{
+    font_desc = new_font;
+}
+
 extern void ui_perform_action(Action* action)
 {
     switch(action->type) {
@@ -172,6 +196,9 @@ extern void ui_perform_action(Action* action)
         } break;
         case SET_COLOR2: {
             color2 = action->color;
+        } break;
+        case TEXT_INPUT: {
+            gui_open_text_dialog();
         } break;
         default:
             return;

@@ -6,6 +6,25 @@ local ZOOM = 0.1
 
 local temp_keys, keys, mode_keys
 
+local activity = "idle"
+
+local function is_brush(mod)
+    local mode = pinsel.get_mode()
+    return (mode == BRUSH_MODE and mod.button1) or
+           (mode == ERASER_MODE and mod.button3)
+end
+local function is_erase(mod)
+    local mode = pinsel.get_mode()
+    return (mode == BRUSH_MODE and mod.button3) or
+           (mode == ERASER_MODE and mod.button1)
+end
+local function is_drag(mod) return mod.button2 end
+local x_start, y_start
+local x_text = 0
+local y_text = 0
+local text = ""
+local is_texting = false
+
 mode_keys = {
     { "b", function() pinsel.set_mode(BRUSH_MODE); keys = temp_keys end },
     { "e", function() pinsel.set_mode(ERASER_MODE); keys = temp_keys end },
@@ -17,13 +36,14 @@ keys = {
     { "l",   function() pinsel.move( - DELTA,       0 ) end, "Navigation", "move right" },
     { "j",   function() pinsel.move(       0, - DELTA ) end, "Navigation", "move down" },
     { "k",   function() pinsel.move(       0,   DELTA ) end, "Navigation", "move up" },
-    { "scroll_up", function() pinsel.zoom( ZOOM) end,              "Navigation", "zoom in" },
-    { "scroll_down", function() pinsel.zoom(-ZOOM) end,              "Navigation", "zoom out" },
+    { "v",   function() pinsel.open_text_input(); pinsel.set_mode(TEXT_MODE) end, "Test", "test test" },
+    { "scroll_up", function() pinsel.zoom( ZOOM) end, "Navigation", "zoom in" },
+    { "scroll_down", function() pinsel.zoom(-ZOOM) end, "Navigation", "zoom out" },
     { "u",   function() pinsel.rotate(false) end, "Manipulation", "rotate clockwise" },
     { "i",   function() pinsel.rotate(true) end,  "Manipulation", "rotate counterclockwise" },
     { "y",   function() pinsel.flip(false) end,   "Manipulation", "flip horizontally" },
     { "o",   function() pinsel.flip(true) end,    "Manipulation", "flip vertically" },
-    { "a",   function() pinsel.set_color1(math.random(), math.random(), math.random(), 1) end, "GUI", "make the current color black" },
+    { "a",   function() pinsel.set_color1(math.random(), math.random(), math.random(), 1) end, "GUI", "random color" },
     { "s",   pinsel.switch_colors, "GUI", "switch the two colors" },
     { "C-t", function() temp_keys = keys; keys = mode_keys end, "GUI", "modal binding for modes" },
     { "M-x", pinsel.undo_all, "History", "undo all changes" },
@@ -45,23 +65,18 @@ pinsel.on_key = function(key, mod)
 end
 
 pinsel.on_click = function(b, x, y, mod)
-    -- print(b, x, y, mod.control)
+    if pinsel.get_mode() == TEXT_MODE then
+        x_text = x
+        y_text = y
+        if is_texting then
+            pinsel.discard()
+            pinsel.text(text, x_text, y_text)
+        else
+            is_texting = true
+            pinsel.open_text_input()
+        end
+    end
 end
-
-local activity = "idle"
-
-local function is_brush(mod)
-    local mode = pinsel.get_mode()
-    return (mode == BRUSH_MODE and mod.button1) or
-           (mode == ERASER_MODE and mod.button3)
-end
-local function is_erase(mod)
-    local mode = pinsel.get_mode()
-    return (mode == BRUSH_MODE and mod.button3) or
-           (mode == ERASER_MODE and mod.button1)
-end
-local function is_drag(mod) return mod.button2 end
-local x_start, y_start
 
 pinsel.on_motion = function(x, y, mod)
     if is_brush(mod) then activity = "brush" end
@@ -95,18 +110,37 @@ pinsel.on_motion = function(x, y, mod)
         end
     end
 
-    if is_drag(mod) then
-        if activity == "drag" then
+    if is_drag(mod) or activity == "drag" then
+        if is_drag(mod) and activity == "drag" then
             pinsel.move(x - x_start, y - y_start)
-        else
+        elseif is_drag(mod) then
             x_start = x
             y_start = y
             activity = "drag"
+        else
+            activity = "idle"
         end
+    end
+end
+
+pinsel.on_text_change = function(t)
+    text = t
+    pinsel.text(text, x_text, y_text)
+end
+
+pinsel.on_text_close = function(accepted)
+    pinsel.discard()
+    print("hey")
+    if accepted then
+        pinsel.text(text, x_text, y_text)
+        pinsel.apply()
+        is_texting = false
+        text = ""
     end
 end
 
 pinsel.set_color1(0, 0, 0, 1)
 pinsel.set_color2(0.5, 0, 0, 0.5)
 pinsel.set_width(20)
+pinsel.history_limit = 1
 

@@ -1,17 +1,17 @@
 #include <gtk/gtk.h>
 
-#include "pinsel.h"
 #include "history.h"
 
 static GdkPixbuf *original;
 static GdkPixbuf *current;
 static GQueue *undo_history;
 static GQueue *redo_history;
+static int history_limit;
 
 void history_add_one_to_undo(GdkPixbuf *layer)
 {
     g_queue_push_head(undo_history, (gpointer) gdk_pixbuf_copy(layer));
-    if (g_queue_get_length(undo_history) > HISTORY_LIMIT) {
+    if (g_queue_get_length(undo_history) > history_limit) {
         GdkPixbuf *temp = (GdkPixbuf*) g_queue_pop_tail(undo_history);
         g_object_unref(temp);
     }
@@ -20,13 +20,13 @@ void history_add_one_to_undo(GdkPixbuf *layer)
 void history_add_one_to_redo(GdkPixbuf *layer)
 {
     g_queue_push_head(redo_history, (gpointer) gdk_pixbuf_copy(layer));
-    if (g_queue_get_length(redo_history) > HISTORY_LIMIT) {
+    if (g_queue_get_length(redo_history) > history_limit) {
         GdkPixbuf *temp = (GdkPixbuf*) g_queue_pop_tail(redo_history);
         g_object_unref(temp);
     }
 }
 
-extern void history_init(GdkPixbuf *layer)
+extern void history_init(GdkPixbuf *layer, int limit)
 {
     if (undo_history != NULL)
         g_queue_clear_full(undo_history, g_object_unref);
@@ -36,6 +36,7 @@ extern void history_init(GdkPixbuf *layer)
     current = gdk_pixbuf_copy(layer);
     undo_history = g_queue_new();
     redo_history = g_queue_new();
+    history_limit = limit;
 }
 
 extern void history_add_one(GdkPixbuf *layer)

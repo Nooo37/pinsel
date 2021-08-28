@@ -84,3 +84,5 @@ function pinsel.get_shortcut_dialog()
     return res
 end
 
+pinsel.history_limit = 20
+

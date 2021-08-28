@@ -3,7 +3,6 @@
 #include <gio/gunixinputstream.h>
 #include <stdlib.h>
 
-#include "gio/gmenumodel.h"
 #include "pinsel.h"
 #include "config.h"
 #include "pixbuf.h"
@@ -95,7 +94,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    pix_init(init_pix);
+    int limit = config_get_history_limit();
+    pix_init(init_pix, limit);
     pix_set_dest(init_dest);
 
     gtk_init(&argc, &argv);

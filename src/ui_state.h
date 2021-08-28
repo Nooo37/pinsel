@@ -61,4 +61,12 @@ extern void ui_set_width(int new_width);
 
 extern int ui_get_width();
 
+extern PangoFontDescription* ui_get_font();
+
+extern void ui_set_font(PangoFontDescription *new_font);
+
+extern void ui_set_text(char* new_text);
+
+extern char* ui_get_text();
+
 #endif
