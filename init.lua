@@ -1,5 +1,4 @@
 local pinsel = pinsel
-local CONTROL, ALT = CONTROL, ALT
 local BRUSH_MODE, ERASER_MODE, TEXT_MODE = BRUSH_MODE, ERASER_MODE, TEXT_MODE
 
 local DELTA = 10
@@ -46,7 +45,11 @@ pinsel.on_key = function(key, mod)
 end
 
 pinsel.on_click = function(b, x, y, mod)
-    print(b, x, y, mod.control)
+    -- print(b, x, y, mod.control)
+end
+
+pinsel.on_motion = function(x, y, mod)
+    print(x, y, mod.button1)
 end
 
 pinsel.set_color1(0, 0, 0, 1)

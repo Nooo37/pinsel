@@ -22,6 +22,8 @@ extern void config_perform_key_event(char *key, Modifiers mod);
 
 extern void config_perform_click_event(int button, int x, int y, Modifiers mod);
 
+extern void config_perform_motion_event(int x, int y, Modifiers mod);
+
 extern char* config_get_shortcut_ui();
 
 #endif

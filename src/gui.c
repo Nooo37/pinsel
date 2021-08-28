@@ -100,7 +100,18 @@ static void set_title_saved(gboolean is_saved)
     }
 }
 
-// connect to that to get painting (and future dragging) abilities
+static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
+{
+    Modifiers mods;
+    mods.shift = event & GDK_SHIFT_MASK;
+    mods.control = event & GDK_CONTROL_MASK;
+    mods.alt = event & GDK_MOD1_MASK;
+    mods.button1 = event & GDK_BUTTON1_MASK;
+    mods.button2 = event & GDK_BUTTON2_MASK;
+    mods.button3 = event & GDK_BUTTON3_MASK;
+    return mods;
+}
+
 static gint motion_notify_event( GtkWidget *widget,
                                  GdkEventMotion *event )
 {
@@ -118,6 +129,9 @@ static gint motion_notify_event( GtkWidget *widget,
 
     x_translated = ui_translate_x(x);
     y_translated = ui_translate_y(y);
+
+    Modifiers mod = convert_gdk_to_modifiers(state);
+    config_perform_motion_event(x_translated, y_translated, mod);
 
     // do a line when holding shift and moving the mouse in brush mode
     if ((state & GDK_BUTTON1_MASK) && (state & GDK_SHIFT_MASK) && ui_get_mode() == BRUSH) {
@@ -562,18 +576,6 @@ static void update_toggle_buttons()
     gtk_toggle_button_set_active(text_toggle, mode == TEXT);
     gtk_toggle_button_set_active(eraser_toggle, mode == ERASER);
     gtk_toggle_button_set_active(brush_toggle, mode == BRUSH);
-}
-
-static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
-{
-    Modifiers mods;
-    mods.shift = event & GDK_SHIFT_MASK;
-    mods.control = event & GDK_CONTROL_MASK;
-    mods.alt = event & GDK_MOD1_MASK;
-    mods.button1 = event & GDK_BUTTON1_MASK;
-    mods.button2 = event & GDK_BUTTON2_MASK;
-    mods.button3 = event & GDK_BUTTON3_MASK;
-    return mods;
 }
 
 static void area_clicked_on(GtkWidget      *widget,

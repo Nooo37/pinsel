@@ -230,12 +230,6 @@ extern int config_init(char* config_file)
     luaL_newlib(L, l);
     lua_setglobal(L, "pinsel");
 
-    lua_pushstring(L, "C-");
-    lua_setglobal(L, "CONTROL");
-
-    lua_pushstring(L, "M-");
-    lua_setglobal(L, "ALT");
-
     lua_pushinteger(L, BRUSH);
     lua_setglobal(L, "BRUSH_MODE");
     lua_pushinteger(L, ERASER);
@@ -305,5 +299,39 @@ extern void config_perform_click_event(int button, int x, int y, Modifiers mod)
     lua_pushboolean(L, mod.control);
     lua_settable( L, -3 );
     lua_call(L, 4, 0);
+    lua_pop(L, 1);
+}
+
+extern void config_perform_motion_event(int x, int y, Modifiers mod)
+{
+
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel");
+    lua_pushstring(L, "on_motion");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, 1))
+        return;
+    lua_pushnumber(L, x);
+    lua_pushnumber(L, y);
+    lua_newtable(L);
+    lua_pushstring(L, "shift");
+    lua_pushboolean(L, mod.shift);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "alt");
+    lua_pushboolean(L, mod.alt);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "control");
+    lua_pushboolean(L, mod.control);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "button1");
+    lua_pushboolean(L, mod.button1);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "button2");
+    lua_pushboolean(L, mod.button2);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "button3");
+    lua_pushboolean(L, mod.button3);
+    lua_settable( L, -3 );
+    lua_call(L, 3, 0);
     lua_pop(L, 1);
 }
