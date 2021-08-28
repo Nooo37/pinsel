@@ -17,17 +17,6 @@ static void copy_pix_to_displayed()
     displayed = gdk_pixbuf_copy(draw_layer);
 }
 
-static gboolean should_save_in_history(Action* action)
-{
-    if (action->type == BRUSH_ACTION)
-        return !action->brush->is_temporary;
-    if (action->type == ERASE_ACTION)
-        return !action->erase->is_temporary;
-    if (action->type == TEXT_ACTION)
-        return !action->text->is_temporary;
-    return action->type != UNDO && action->type != REDO && action->type != SAVE;
-}
-
 static void update_geo()
 {
     width = gdk_pixbuf_get_width(draw_layer);
@@ -136,47 +125,35 @@ extern void pix_load_new_image(char* filename)
 extern void pix_perform_action(Action *action)
 {
     switch (action->type) {
+        case APPLY: {
+                g_object_unref(draw_layer);
+                draw_layer = gdk_pixbuf_copy(displayed);
+            } break;
+        case DISCARD: {
+                g_object_unref(displayed);
+                copy_pix_to_displayed();
+                return;
+            } break;
         case BRUSH_ACTION: {
-                if (action->brush->is_temporary) {
-                    g_object_unref(displayed);
-                    GdkPixbuf *temp = pix_get_current();
-                    displayed = perform_action_brush(action->brush, temp);
-                    g_object_unref(temp);
-                } else {
-                    GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
-                    g_object_unref(draw_layer);
-                    draw_layer = perform_action_brush(action->brush, temp);
-                    g_object_unref(temp);
-                    copy_pix_to_displayed();
-                }
+                g_object_unref(displayed);
+                GdkPixbuf *temp = pix_get_current();
+                displayed = perform_action_brush(action->brush, temp);
+                g_object_unref(temp);
+                return;
             } break;
         case ERASE_ACTION: { 
-                if (action->erase->is_temporary) {
-                    g_object_unref(displayed);
-                    GdkPixbuf *temp = pix_get_current();
-                    displayed = perform_action_erase(action->erase, temp);
-                    g_object_unref(temp);
-                } else {
-                    GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
-                    g_object_unref(draw_layer);
-                    draw_layer = perform_action_erase(action->erase, temp);
-                    g_object_unref(temp);
-                    copy_pix_to_displayed();
-                }
+                g_object_unref(displayed);
+                GdkPixbuf *temp = pix_get_current();
+                displayed = perform_action_erase(action->erase, temp);
+                g_object_unref(temp);
+                return;
             } break;
         case TEXT_ACTION: {
-                if (action->text->is_temporary) {
-                    g_object_unref(displayed);
-                    GdkPixbuf *temp = pix_get_current();
-                    displayed = perform_action_text(action->text, temp);
-                    g_object_unref(temp);
-                } else {
-                    GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
-                    g_object_unref(draw_layer);
-                    draw_layer = perform_action_text(action->text, temp);
-                    g_object_unref(temp);
-                    copy_pix_to_displayed();
-                }
+                g_object_unref(displayed);
+                GdkPixbuf *temp = pix_get_current();
+                displayed = perform_action_text(action->text, temp);
+                g_object_unref(temp);
+                return;
             } break;
         case FLIP_HORIZONTALLY: {
                 GdkPixbuf *temp;
@@ -229,12 +206,14 @@ extern void pix_perform_action(Action *action)
                 draw_layer = history_undo_one();
                 copy_pix_to_displayed();
                 update_geo();
+                return;
             } break;
         case REDO: {
                 g_object_unref(draw_layer);
                 draw_layer = history_redo_one();
                 copy_pix_to_displayed();
                 update_geo();
+                return;
             } break;
         case UNDO_ALL: {
                 g_object_unref(draw_layer);
@@ -248,11 +227,9 @@ extern void pix_perform_action(Action *action)
         default:
             return;
     }
-    if (should_save_in_history(action)) {
-        GdkPixbuf *temp = pix_get_current();
-        history_add_one(temp);
-        g_object_unref(temp);
-        is_saved = FALSE;
-    }
+    GdkPixbuf *temp = pix_get_current();
+    history_add_one(temp);
+    g_object_unref(temp);
+    is_saved = FALSE;
 }
 

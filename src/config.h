@@ -20,6 +20,8 @@ extern void config_perform_self_contained_action(ActionType type);
 
 extern void config_perform_key_event(char *key, Modifiers mod);
 
+extern void config_perform_click_event(int button, int x, int y, Modifiers mod);
+
 extern char* config_get_shortcut_ui();
 
 #endif

@@ -45,6 +45,9 @@ pinsel.on_key = function(key, mod)
     end
 end
 
+pinsel.on_click = function(b, x, y, mod)
+    print(b, x, y, mod.control)
+end
 
 pinsel.set_color1(0.5, 0, 0, 0.5)
 pinsel.set_color2(1, 1, 1, 1)

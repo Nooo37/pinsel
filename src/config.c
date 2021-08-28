@@ -57,75 +57,57 @@ static int config_move(lua_State *L)
 
 static int config_flip(lua_State *L)
 {
-    gboolean vertically = lua_toboolean(L, 1);
-    Action temp;
-    temp.type = vertically ? FLIP_HORIZONTALLY : FLIP_VERTICALLY;
-    config_perform_action(&temp);
+    gboolean horizontally = lua_toboolean(L, 1);
+    config_perform_self_contained_action(horizontally ? FLIP_HORIZONTALLY : FLIP_VERTICALLY);
     return 1;
 }
 
 static int config_rotate(lua_State *L)
 {
     gboolean counterclockwise = lua_toboolean(L, 1);
-    Action temp;
-    temp.type = counterclockwise ? ROTATE_COUNTERCLOCKWISE : ROTATE_CLOCKWISE;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(counterclockwise ? ROTATE_COUNTERCLOCKWISE : ROTATE_CLOCKWISE);
     return 1;
 }
 
 static int config_undo_all(lua_State *L)
 {
-    Action temp;
-    temp.type = UNDO_ALL;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(UNDO_ALL);
     return 1;
 }
 
 static int config_undo(lua_State *L)
 {
-    Action temp;
-    temp.type = UNDO;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(UNDO);
     return 1;
 }
 
 static int config_redo(lua_State *L)
 {
-    Action temp;
-    temp.type = REDO;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(REDO);
     return 1;
 }
 
 static int config_quit_unsafe(lua_State *L)
 {
-    Action temp;
-    temp.type = QUIT_UNSAFE;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(QUIT_UNSAFE);
     return 1;
 }
 
 static int config_save(lua_State *L)
 {
-    Action temp;
-    temp.type = SAVE;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(SAVE);
     return 1;
 }
 
 static int config_save_as(lua_State *L)
 {
-    Action temp;
-    temp.type = SAVE_AS;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(SAVE_AS);
     return 1;
 }
 
 static int config_open(lua_State *L)
 {
-    Action temp;
-    temp.type = OPEN;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(OPEN);
     return 1;
 }
 
@@ -175,12 +157,22 @@ static int config_set_color2(lua_State *L)
     return 1;
 }
 
+static int config_apply(lua_State *L)
+{
+    config_perform_self_contained_action(APPLY);
+    return 1;
+}
+
+static int config_discard(lua_State *L)
+{
+    config_perform_self_contained_action(DISCARD);
+    return 1;
+}
+
 
 static int config_switch_colors(lua_State *L)
 {
-    Action temp;
-    temp.type = SWITCH_COLORS;
-    config_perform_action(&temp);
+    config_perform_self_contained_action(SWITCH_COLORS);
     return 1;
 }
 
@@ -188,30 +180,6 @@ static int config_get_mode(lua_State *L)
 {
     lua_pushinteger(L, ui_get_mode());
     return 1;
-}
-
-
-static void perform_lua_keybind(char* keypress, Modifiers mods)
-{
-    lua_settop(L, 0);
-    lua_getglobal(L, "pinsel_api");
-    lua_pushstring(L, "on_key");
-    lua_gettable(L, -2);
-    if (lua_isnil(L, 1))
-        return;
-    lua_pushstring(L, keypress);
-    lua_newtable(L);
-    lua_pushstring(L, "shift");
-    lua_pushboolean(L, mods.shift);
-    lua_settable( L, -3 );
-    lua_pushstring(L, "alt");
-    lua_pushboolean(L, mods.alt);
-    lua_settable( L, -3 );
-    lua_pushstring(L, "control");
-    lua_pushboolean(L, mods.control);
-    lua_settable( L, -3 );
-    lua_call(L, 2, 0);
-    lua_pop(L, 1);
 }
 
 extern char* config_get_shortcut_ui()
@@ -237,8 +205,8 @@ extern int config_init(char* config_file)
     lua_newtable(L);
 
     static const luaL_Reg l[] = {
-        /* { "discard",       config_zoom }, */
-        /* { "flush",       config_zoom }, */
+        { "discard",    config_discard },
+        { "apply",      config_apply },
         { "zoom",       config_zoom },
         { "rotate",     config_rotate},
         { "flip",       config_flip},
@@ -294,6 +262,48 @@ extern int config_init(char* config_file)
 
 extern void config_perform_key_event(char *key, Modifiers mod)
 {
-    perform_lua_keybind(key, mod);
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel_api");
+    lua_pushstring(L, "on_key");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, 1))
+        return;
+    lua_pushstring(L, key);
+    lua_newtable(L);
+    lua_pushstring(L, "shift");
+    lua_pushboolean(L, mod.shift);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "alt");
+    lua_pushboolean(L, mod.alt);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "control");
+    lua_pushboolean(L, mod.control);
+    lua_settable( L, -3 );
+    lua_call(L, 2, 0);
+    lua_pop(L, 1);
 }
 
+extern void config_perform_click_event(int button, int x, int y, Modifiers mod)
+{
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel_api");
+    lua_pushstring(L, "on_click");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, 1))
+        return;
+    lua_pushnumber(L, button);
+    lua_pushnumber(L, x);
+    lua_pushnumber(L, y);
+    lua_newtable(L);
+    lua_pushstring(L, "shift");
+    lua_pushboolean(L, mod.shift);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "alt");
+    lua_pushboolean(L, mod.alt);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "control");
+    lua_pushboolean(L, mod.control);
+    lua_settable( L, -3 );
+    lua_call(L, 4, 0);
+    lua_pop(L, 1);
+}

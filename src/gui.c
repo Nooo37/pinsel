@@ -130,7 +130,6 @@ static gint motion_notify_event( GtkWidget *widget,
 
             brush_action.width = radius;
             brush_action.positions = coords;
-            brush_action.is_temporary = TRUE;
 
             Action temp_action;
             temp_action.type = BRUSH_ACTION;
@@ -157,7 +156,6 @@ static gint motion_notify_event( GtkWidget *widget,
 
             brush_action.width = radius;
             brush_action.positions = coords;
-            brush_action.is_temporary = FALSE;
 
             Action temp_action;
             temp_action.type = BRUSH_ACTION;
@@ -167,6 +165,7 @@ static gint motion_notify_event( GtkWidget *widget,
             g_free(temp);
             g_list_free(coords);
             g_free(start_line);
+            config_perform_self_contained_action(APPLY);
             coords = NULL;
             activity = IDLE;
             return TRUE;
@@ -184,7 +183,6 @@ static gint motion_notify_event( GtkWidget *widget,
 
             brush_action.width = radius;
             brush_action.positions = coords;
-            brush_action.is_temporary = TRUE;
 
             Action temp_action;
             temp_action.type = BRUSH_ACTION;
@@ -198,7 +196,6 @@ static gint motion_notify_event( GtkWidget *widget,
         if (activity == BRUSHING) {
             brush_action.width = radius;
             brush_action.positions = coords;
-            brush_action.is_temporary = FALSE;
 
             Action temp_action;
             temp_action.type = BRUSH_ACTION;
@@ -206,6 +203,7 @@ static gint motion_notify_event( GtkWidget *widget,
 
             pix_perform_action(&temp_action);
             g_list_free_full(coords, g_free);
+            config_perform_self_contained_action(APPLY);
             coords = NULL;
             activity = IDLE;
         }
@@ -224,7 +222,6 @@ static gint motion_notify_event( GtkWidget *widget,
             my_erase_action.width = radius;
             my_erase_action.positions = coords;
             my_erase_action.alpha = 1;
-            my_erase_action.is_temporary = TRUE;
 
             Action temp_action;
             temp_action.type = ERASE_ACTION;
@@ -240,7 +237,6 @@ static gint motion_notify_event( GtkWidget *widget,
             my_erase_action.width = radius;
             my_erase_action.positions = coords;
             my_erase_action.alpha = 1;
-            my_erase_action.is_temporary = FALSE;
 
             Action temp_action;
             temp_action.type = ERASE_ACTION;
@@ -248,6 +244,7 @@ static gint motion_notify_event( GtkWidget *widget,
 
             pix_perform_action(&temp_action);
             g_list_free_full(coords, g_free);
+            config_perform_self_contained_action(APPLY);
             coords = NULL;
             activity = IDLE;
         }
@@ -563,39 +560,6 @@ static void open_shortcuts_dialog(GtkWidget *temp, gpointer shortcuts_dialog)
     g_object_unref(builder);
 }
 
-static void area_clicked_on(GtkWidget      *widget,
-                            GdkEventButton *event)
-{
-    int x, y, x_translated, y_translated;
-
-    x = event->x;
-    y = event->y;
-    x_translated = ui_translate_x(x);
-    y_translated = ui_translate_y(y);
-
-    if (event->button == 1 && ui_get_mode() == TEXT) {
-        text_x = x_translated;
-        text_y = y_translated;
-
-        if (activity == TEXTING) {
-            temporary_text_display();
-        } else {
-            activity = TEXTING;
-            gtk_widget_show(GTK_WIDGET(text_dialog));
-        }
-    }
-    if (event->button == 1 && ui_get_mode() == BRUSH) {
-        if ((event->type & GDK_BUTTON_PRESS_MASK) != 0) {
-            printf("rel\n");
-        }
-        if ((event->type & GDK_BUTTON_RELEASE_MASK) != 0) {
-            printf("norel\n");
-        }
-    }
-    update_drawing_area();
-    // TODO: on single click draw dot
-}
-
 static void update_color_buttons()
 {
     gtk_color_chooser_set_rgba(color_picker_primary, ui_get_color1());
@@ -621,6 +585,22 @@ static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
     mods.button3 = event & GDK_BUTTON3_MASK;
     return mods;
 }
+
+static void area_clicked_on(GtkWidget      *widget,
+                            GdkEventButton *event)
+{
+    int x, y, x_translated, y_translated;
+
+    x = event->x;
+    y = event->y;
+    x_translated = ui_translate_x(x);
+    y_translated = ui_translate_y(y);
+
+    Modifiers mod = convert_gdk_to_modifiers(event->state);
+    config_perform_click_event(event->button, x_translated, y_translated, mod);
+    update_drawing_area();
+}
+
 
 static gboolean on_scroll(GtkWidget *widget,
                           GdkEventScroll *event,
