@@ -228,7 +228,7 @@ extern int config_init(char* config_file)
     };
 
     luaL_newlib(L, l);
-    lua_setglobal(L, "pinsel_api");
+    lua_setglobal(L, "pinsel");
 
     lua_pushstring(L, "C-");
     lua_setglobal(L, "CONTROL");
@@ -263,7 +263,7 @@ extern int config_init(char* config_file)
 extern void config_perform_key_event(char *key, Modifiers mod)
 {
     lua_settop(L, 0);
-    lua_getglobal(L, "pinsel_api");
+    lua_getglobal(L, "pinsel");
     lua_pushstring(L, "on_key");
     lua_gettable(L, -2);
     if (lua_isnil(L, 1))
@@ -286,7 +286,7 @@ extern void config_perform_key_event(char *key, Modifiers mod)
 extern void config_perform_click_event(int button, int x, int y, Modifiers mod)
 {
     lua_settop(L, 0);
-    lua_getglobal(L, "pinsel_api");
+    lua_getglobal(L, "pinsel");
     lua_pushstring(L, "on_click");
     lua_gettable(L, -2);
     if (lua_isnil(L, 1))

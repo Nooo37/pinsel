@@ -1,4 +1,4 @@
-pinsel = pinsel_api
+pinsel = pinsel
 
 local keys
 

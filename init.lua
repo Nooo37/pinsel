@@ -24,7 +24,7 @@ keys = {
     { "i",   function() pinsel.rotate(true) end,  "Manipulation", "rotate counterclockwise" },
     { "y",   function() pinsel.flip(false) end,   "Manipulation", "flip horizontally" },
     { "o",   function() pinsel.flip(true) end,    "Manipulation", "flip vertically" },
-    { "a",   function () pinsel.set_color1(0, 0, 0, 1) end, "GUI", "make the current color black" },
+    { "a",   function () pinsel.set_color1(math.random(), math.random(), math.random(), 1) end, "GUI", "make the current color black" },
     { "s",   pinsel.switch_colors, "GUI", "switch the two colors" },
     { "C-t", function() temp_keys = keys; keys = mode_keys end, "GUI", "modal binding for modes" },
     { "M-x", pinsel.undo_all, "History", "undo all changes" },
@@ -49,6 +49,6 @@ pinsel.on_click = function(b, x, y, mod)
     print(b, x, y, mod.control)
 end
 
-pinsel.set_color1(0.5, 0, 0, 0.5)
-pinsel.set_color2(1, 1, 1, 1)
+pinsel.set_color1(0, 0, 0, 1)
+pinsel.set_color2(0.5, 0, 0, 0.5)
 

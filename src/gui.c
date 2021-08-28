@@ -294,16 +294,6 @@ static gboolean on_draw (GtkWidget *da,
     return FALSE;
 }
 
-static void increase_radius()
-{
-    gtk_adjustment_set_value(radius_scale, radius + DELTA_RADIUS);
-}
-
-static void decrease_radius()
-{
-    gtk_adjustment_set_value(radius_scale, radius - DELTA_RADIUS);
-}
-
 static void redraw_popup(GtkWidget *temp, gpointer popup)
 {
     gtk_widget_queue_draw(GTK_WIDGET(popup));
