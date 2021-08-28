@@ -627,12 +627,27 @@ static void update_toggle_buttons()
     gtk_toggle_button_set_active(brush_toggle, mode == BRUSH);
 }
 
+static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
+{
+    Modifiers mods;
+    mods.shift = event & GDK_SHIFT_MASK;
+    mods.control = event & GDK_CONTROL_MASK;
+    mods.alt = event & GDK_MOD1_MASK;
+    mods.button1 = event & GDK_BUTTON1_MASK;
+    mods.button2 = event & GDK_BUTTON2_MASK;
+    mods.button3 = event & GDK_BUTTON3_MASK;
+    return mods;
+}
+
 // global keybinds
 static void my_key_press(GtkWidget *widget,
                          GdkEventKey *event,
                          gpointer user_data) 
 {
-    config_perform_event(event);
+    char key[0];
+    key[0] = (char) event->keyval;
+    Modifiers mod = convert_gdk_to_modifiers(event->state);
+    config_perform_key_event(key, mod);
     update_drawing_area();
     update_toggle_buttons();
     update_color_buttons();

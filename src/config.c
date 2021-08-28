@@ -4,6 +4,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#include "config.h"
 #include "action.h"
 #include "ui_state.h"
 #include "pixbuf.h"
@@ -190,7 +191,7 @@ static int config_get_mode(lua_State *L)
 }
 
 
-static void perform_lua_keybind(char* keypress)
+static void perform_lua_keybind(char* keypress, Modifiers mods)
 {
     lua_settop(L, 0);
     lua_getglobal(L, "pinsel_api");
@@ -199,7 +200,17 @@ static void perform_lua_keybind(char* keypress)
     if (lua_isnil(L, 1))
         return;
     lua_pushstring(L, keypress);
-    lua_call(L, 1, 0);
+    lua_newtable(L);
+    lua_pushstring(L, "shift");
+    lua_pushboolean(L, mods.shift);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "alt");
+    lua_pushboolean(L, mods.alt);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "control");
+    lua_pushboolean(L, mods.control);
+    lua_settable( L, -3 );
+    lua_call(L, 2, 0);
     lua_pop(L, 1);
 }
 
@@ -279,21 +290,8 @@ extern int config_init(char* config_file)
     return 1;
 }
 
-extern void config_perform_event(gpointer event)
+extern void config_perform_key_event(char *key, Modifiers mod)
 {
-    GdkEventKey *ek = (GdkEventKey*) event;
-    char *keypress;
-    // TODO: Some preprocessing needed for non-letter keys
-    char *keystring;
-    keystring = g_strdup_printf("%c", ek->keyval);
-    if (is_no_mod(ek))
-        keypress = g_strdup_printf("%s", keystring);
-    else if (is_only_control(ek))
-        keypress = g_strdup_printf("C-%s", keystring);
-    else if (is_only_alt(ek))
-        keypress = g_strdup_printf("M-%s", keystring);
-    else if (is_only_alt_control(ek))
-        keypress = g_strdup_printf("C-M-%s", keystring);
-    perform_lua_keybind(keypress);
+    perform_lua_keybind(key, mod);
 }
 

@@ -36,7 +36,16 @@ keys = {
     { "C-s", pinsel.save,    "Quit, Save, Open", "save the current image" },
     { "C-S", pinsel.save_as, "Quit, Save, Open", "save the image to a (new) file" },
 }
-pinsel.set_keys(keys)
+
+pinsel.on_key = function(key, mod)
+    if mod.alt then key = "M-" .. key end
+    if mod.control then key = "C-" .. key end
+    for _, k in ipairs(keys) do
+        print(key, k[1])
+        if k[1] == key then k[2]() end
+    end
+end
+
 
 pinsel.set_color1(0.5, 0, 0, 0.5)
 pinsel.set_color2(1, 1, 1, 1)

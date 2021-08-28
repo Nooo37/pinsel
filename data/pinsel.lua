@@ -9,14 +9,6 @@ local function table_contains(t, v)
     return false
 end
 
-pinsel.on_key = function(keypress)
-    for _, entry in ipairs(keys) do
-        if entry[1] == keypress then entry[2]() return end
-    end
-end
-
-pinsel.set_keys = function(t) keys = t end
-
 local function get_all_categories()
     local res = { }
     for _, key in ipairs(keys) do
