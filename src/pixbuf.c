@@ -1,7 +1,6 @@
 #include <gtk/gtk.h>
 
 #include "action.h"
-#include "draw.h"
 #include "history.h"
 
 static GdkPixbuf *draw_layer;
@@ -17,15 +16,10 @@ static void copy_pix_to_displayed()
     displayed = gdk_pixbuf_copy(draw_layer);
 }
 
-static gboolean should_save_in_history(Action* action)
+static void copy_displayed_to_pix()
 {
-    if (action->type == BRUSH_ACTION)
-        return !action->brush->is_temporary;
-    if (action->type == ERASE_ACTION)
-        return !action->erase->is_temporary;
-    if (action->type == TEXT_ACTION)
-        return !action->text->is_temporary;
-    return action->type != UNDO && action->type != REDO && action->type != SAVE;
+    g_object_unref(draw_layer);
+    draw_layer = gdk_pixbuf_copy(displayed);
 }
 
 static void update_geo()
@@ -75,12 +69,8 @@ extern GdkPixbuf* pix_get_current()
 
 extern GdkPixbuf* pix_get_displayed()
 {
-    return gdk_pixbuf_copy(displayed);
-}
-
-extern void pix_undo_temrporarily_action()
-{
-    copy_pix_to_displayed();
+     /* only used for updating the drawing area -> reference enough */
+    return displayed;
 }
 
 extern char* pix_get_dest()
@@ -136,47 +126,29 @@ extern void pix_load_new_image(char* filename)
 extern void pix_perform_action(Action *action)
 {
     switch (action->type) {
-        case BRUSH_ACTION: {
-                if (action->brush->is_temporary) {
-                    g_object_unref(displayed);
-                    GdkPixbuf *temp = pix_get_current();
-                    displayed = perform_action_brush(action->brush, temp);
-                    g_object_unref(temp);
-                } else {
-                    GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
-                    g_object_unref(draw_layer);
-                    draw_layer = perform_action_brush(action->brush, temp);
-                    g_object_unref(temp);
+        case DISCARD: {
                     copy_pix_to_displayed();
-                }
+                } break;
+        case FLUSH: {
+                    copy_displayed_to_pix();
+                } break;
+        case BRUSH_ACTION: {
+                g_object_unref(displayed);
+                GdkPixbuf *temp = pix_get_current();
+                displayed = perform_action_brush(action->brush, temp);
+                g_object_unref(temp);
             } break;
         case ERASE_ACTION: { 
-                if (action->erase->is_temporary) {
-                    g_object_unref(displayed);
-                    GdkPixbuf *temp = pix_get_current();
-                    displayed = perform_action_erase(action->erase, temp);
-                    g_object_unref(temp);
-                } else {
-                    GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
-                    g_object_unref(draw_layer);
-                    draw_layer = perform_action_erase(action->erase, temp);
-                    g_object_unref(temp);
-                    copy_pix_to_displayed();
-                }
+                g_object_unref(displayed);
+                GdkPixbuf *temp = pix_get_current();
+                displayed = perform_action_erase(action->erase, temp);
+                g_object_unref(temp);
             } break;
         case TEXT_ACTION: {
-                if (action->text->is_temporary) {
-                    g_object_unref(displayed);
-                    GdkPixbuf *temp = pix_get_current();
-                    displayed = perform_action_text(action->text, temp);
-                    g_object_unref(temp);
-                } else {
-                    GdkPixbuf *temp = gdk_pixbuf_copy(draw_layer);
-                    g_object_unref(draw_layer);
-                    draw_layer = perform_action_text(action->text, temp);
-                    g_object_unref(temp);
-                    copy_pix_to_displayed();
-                }
+                g_object_unref(displayed);
+                GdkPixbuf *temp = pix_get_current();
+                displayed = perform_action_text(action->text, temp);
+                g_object_unref(temp);
             } break;
         case FLIP_HORIZONTALLY: {
                 GdkPixbuf *temp;
@@ -248,10 +220,10 @@ extern void pix_perform_action(Action *action)
         default:
             return;
     }
-    if (should_save_in_history(action)) {
-        GdkPixbuf *temp = pix_get_current();
-        history_add_one(temp);
-        g_object_unref(temp);
+    if (action->type != BRUSH_ACTION && action->type != ERASE_ACTION && 
+            action->type != TEXT_ACTION && action->type != DISCARD && 
+            action->type != UNDO && action->type != REDO) {
+        history_add_one(draw_layer);
         is_saved = FALSE;
     }
 }

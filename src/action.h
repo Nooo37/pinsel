@@ -13,14 +13,14 @@ typedef struct {
     GList *positions;
     GdkRGBA *color;
     int width;
-    gboolean is_temporary;
+    /* gboolean is_temporary; */
 } BrushAction;
 
 typedef struct {
     GList *positions;
     float alpha;
     int width;
-    gboolean is_temporary;
+    /* gboolean is_temporary; */
 } EraseAction;
 
 typedef struct {
@@ -29,11 +29,13 @@ typedef struct {
     GdkRGBA *color;
     int x;
     int y;
-    gboolean is_temporary;
+    /* gboolean is_temporary; */
 } TextAction;
 
 typedef enum {
     // pixbuf related actions
+    DISCARD,
+    FLUSH,
     BRUSH_ACTION,
     ERASE_ACTION,
     TEXT_ACTION,

@@ -4,6 +4,7 @@
 #include <lualib.h>
 #include <lauxlib.h>
 
+#include "config.h"
 #include "action.h"
 #include "ui_state.h"
 #include "pixbuf.h"
@@ -30,6 +31,93 @@ extern void config_perform_self_contained_action(ActionType type)
     config_perform_action(&temp);
 }
 
+/* gets a coord struct from the table that is on top of the stack */
+/* for example: the table {1, 4} becomes the struct coord_t {x: 1, y: 4}*/
+static coord_t* get_one_coord_from_table(lua_State *L)
+{
+    coord_t* temp = g_new(coord_t, 1);
+    if (!lua_istable(L, -1)) {
+        printf("oh no");
+        exit(1);
+        return NULL;
+    }
+    lua_pushnumber(L, 1);
+    lua_gettable(L, -2);
+    int x = luaL_checknumber(L, -1);
+    lua_pushnumber(L, 2);
+    lua_gettable(L, -3);
+    int y = luaL_checknumber(L, -1);
+    lua_pop(L, 2);
+    temp->x = x;
+    temp->y = y;
+    return temp;
+}
+
+/* makes a glist of coord_t structs from the table on top of the stack */
+/* for example: {{1, 2}, {3, 4}} becomes a glist made up of two coord_t structs */
+static GList* get_coords_from_table(lua_State *L)
+{
+    GList *coords = NULL;
+    int i = 1;
+    lua_pushnumber(L, i);
+    lua_gettable(L, -i - 1);
+    i++;
+    while (lua_istable(L, -1)) {
+        coord_t *temp = get_one_coord_from_table(L);
+        coords = g_list_append(coords, (gpointer) temp);
+        lua_pushnumber(L, i);
+        lua_gettable(L, -i - 1);
+        i++;
+    }
+    return coords;
+}
+
+static int config_erase(lua_State *L)
+{
+    EraseAction erase;
+    erase.alpha = 1;
+    erase.width = ui_get_width();
+    erase.positions = get_coords_from_table(L);
+    erase.alpha = 1;
+    Action action;
+    action.erase = &erase;
+    action.type = ERASE_ACTION;
+    config_perform_action(&action);
+    return 0;
+}
+
+static int config_draw(lua_State *L)
+{
+    BrushAction stroke;
+    stroke.color = ui_get_color1();
+    GList *coords = get_coords_from_table(L);
+    stroke.positions = coords;
+    stroke.width = ui_get_width();
+    Action action;
+    action.brush = &stroke;
+    action.type = BRUSH_ACTION;
+    config_perform_action(&action);
+    g_list_free_full(coords, g_free); // segfaults sometimes?
+    return 0;
+}
+
+static int config_text(lua_State *L)
+{
+    TextAction text_action;
+    text_action.color = ui_get_color1();
+    text_action.font = ui_get_font();
+    char* text = lua_tostring(L, 1);
+    text_action.text = text;
+    text_action.x = lua_tointeger(L, 2);
+    text_action.y = lua_tointeger(L, 3);
+    Action action;
+    action.type = TEXT_ACTION;
+    action.text = &text_action;
+    printf("%s\n",text );
+    config_perform_action(&action);
+    return 1;
+}
+
 static int config_zoom(lua_State *L)
 {
     double zoom = luaL_checknumber(L, 1);
@@ -50,6 +138,22 @@ static int config_move(lua_State *L)
     config_perform_action(&temp);
     temp.type = MOVE_HORIZONTALLY;
     temp.move = delta_y;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_discard(lua_State *L)
+{
+    Action temp;
+    temp.type = DISCARD;
+    config_perform_action(&temp);
+    return 1;
+}
+
+static int config_flush(lua_State *L)
+{
+    Action temp;
+    temp.type = FLUSH;
     config_perform_action(&temp);
     return 1;
 }
@@ -138,6 +242,13 @@ static int config_set_mode(lua_State *L)
     return 1;
 }
 
+static int config_set_width(lua_State *L)
+{
+    double new_width = luaL_checknumber(L, 1);
+    ui_set_width((int) new_width);
+    return 1;
+}
+
 static int config_set_color1(lua_State *L)
 {
     double r = luaL_checknumber(L, 1);
@@ -174,7 +285,6 @@ static int config_set_color2(lua_State *L)
     return 1;
 }
 
-
 static int config_switch_colors(lua_State *L)
 {
     Action temp;
@@ -187,20 +297,6 @@ static int config_get_mode(lua_State *L)
 {
     lua_pushinteger(L, ui_get_mode());
     return 1;
-}
-
-
-static void perform_lua_keybind(char* keypress)
-{
-    lua_settop(L, 0);
-    lua_getglobal(L, "pinsel_api");
-    lua_pushstring(L, "on_key");
-    lua_gettable(L, -2);
-    if (lua_isnil(L, 1))
-        return;
-    lua_pushstring(L, keypress);
-    lua_call(L, 1, 0);
-    lua_pop(L, 1);
 }
 
 extern char* config_get_shortcut_ui()
@@ -226,11 +322,15 @@ extern int config_init(char* config_file)
     lua_newtable(L);
 
     static const luaL_Reg l[] = {
+        { "flush",      config_flush },
+        { "discard",    config_discard },
+        { "draw",       config_draw },
+        { "text",       config_text },
+        { "erase",      config_erase },
         { "zoom",       config_zoom },
         { "rotate",     config_rotate},
-        { "flip",       config_flip},
-        { "move",       config_move},
-        { "set_mode",   config_set_mode },
+        { "flip",       config_flip },
+        { "move",       config_move },
         { "undo_all",   config_undo_all },
         { "undo",       config_undo },
         { "redo",       config_redo },
@@ -238,6 +338,8 @@ extern int config_init(char* config_file)
         { "save_as",    config_save_as },
         { "open",       config_open },
         { "quit",       config_quit_unsafe },
+        { "set_mode",   config_set_mode },
+        { "set_width",  config_set_width },
         { "set_color1", config_set_color1 },
         { "set_color2", config_set_color2 },
         { "switch_colors", config_switch_colors },
@@ -279,21 +381,84 @@ extern int config_init(char* config_file)
     return 1;
 }
 
-extern void config_perform_event(gpointer event)
+extern void config_perform_mouse_binding(int x, int y, Modifiers mods)
 {
-    GdkEventKey *ek = (GdkEventKey*) event;
-    char *keypress;
-    // TODO: Some preprocessing needed for non-letter keys
-    char *keystring;
-    keystring = g_strdup_printf("%c", ek->keyval);
-    if (is_no_mod(ek))
-        keypress = g_strdup_printf("%s", keystring);
-    else if (is_only_control(ek))
-        keypress = g_strdup_printf("C-%s", keystring);
-    else if (is_only_alt(ek))
-        keypress = g_strdup_printf("M-%s", keystring);
-    else if (is_only_alt_control(ek))
-        keypress = g_strdup_printf("C-M-%s", keystring);
-    perform_lua_keybind(keypress);
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel_api");
+    lua_pushstring(L, "on_mouse");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, 1))
+        return;
+    lua_pushnumber(L, x);
+    lua_pushnumber(L, y);
+    lua_newtable(L);
+    lua_pushstring(L, "button1");
+    lua_pushboolean(L, mods.button1);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "button2");
+    lua_pushboolean(L, mods.button2);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "button3");
+    lua_pushboolean(L, mods.button3);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "shift");
+    lua_pushboolean(L, mods.shift);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "alt");
+    lua_pushboolean(L, mods.alt);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "control");
+    lua_pushboolean(L, mods.control);
+    lua_settable( L, -3 );
+    lua_call(L, 3, 0);
+    lua_pop(L, 1);
+}
+
+extern void config_perform_click_binding(int button, int x, int y, Modifiers mods)
+{
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel_api");
+    lua_pushstring(L, "on_click");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, 1))
+        return;
+    lua_pushnumber(L, button);
+    lua_pushnumber(L, x);
+    lua_pushnumber(L, y);
+    lua_newtable(L);
+    lua_pushstring(L, "shift");
+    lua_pushboolean(L, mods.shift);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "alt");
+    lua_pushboolean(L, mods.alt);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "control");
+    lua_pushboolean(L, mods.control);
+    lua_settable( L, -3 );
+    lua_call(L, 4, 0);
+    lua_pop(L, 1);
+}
+
+extern void config_perform_key_binding(char *key, Modifiers mods)
+{
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel_api");
+    lua_pushstring(L, "on_key");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, 1))
+        return;
+    lua_pushstring(L, key);
+    lua_newtable(L);
+    lua_pushstring(L, "shift");
+    lua_pushboolean(L, mods.shift);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "alt");
+    lua_pushboolean(L, mods.alt);
+    lua_settable( L, -3 );
+    lua_pushstring(L, "control");
+    lua_pushboolean(L, mods.control);
+    lua_settable( L, -3 );
+    lua_call(L, 2, 0);
+    lua_pop(L, 1);
 }
 

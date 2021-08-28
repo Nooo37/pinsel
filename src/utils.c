@@ -11,26 +11,6 @@ extern float get_sane_scale(int img_width, int img_height, int area_width, int a
         return (area_height / (float) img_height) * (1 - SANE_SCALE_MARGIN);
 }
 
-extern gboolean is_only_control(GdkEventKey* key)
-{
-    return (key->state | GDK_SHIFT_MASK) == (GDK_CONTROL_MASK | GDK_SHIFT_MASK);
-}
-
-extern gboolean is_only_alt(GdkEventKey* key)
-{
-    return (key->state | GDK_SHIFT_MASK) == (GDK_MOD1_MASK | GDK_SHIFT_MASK);
-}
-
-extern gboolean is_only_alt_control(GdkEventKey* key)
-{
-    return (key->state | GDK_SHIFT_MASK) == (GDK_MOD1_MASK | GDK_CONTROL_MASK | GDK_SHIFT_MASK);
-}
-
-extern gboolean is_no_mod(GdkEventKey* key)
-{
-    return (key->state | GDK_SHIFT_MASK) == (GDK_SHIFT_MASK);
-}
-
 extern gboolean is_valid_output_format(const char *format)
 {
     GSList *listrunner = gdk_pixbuf_get_formats();

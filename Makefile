@@ -4,7 +4,7 @@ INSTALLDIR    := /usr/local/bin
 DATADIR       := ./data
 SRCDIR        := ./src
 OBJDIR        := ./obj
-UIFILES       := $(wildcard $(DATADIR)/*.ui) $(DATADIR)/help.txt
+DATAFILES     := $(wildcard $(DATADIR)/*.ui) $(DATADIR)/help.txt $(DATADIR)/pinsel.lua
 RESFILE       := $(SRCDIR)/resources.c
 CFILES        := $(wildcard $(SRCDIR)/*.c) $(RESFILE)
 OBJFILES      := $(CFILES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
@@ -14,7 +14,7 @@ LDLIBS        := $(shell pkg-config --cflags --libs gtk+-3.0 lua)
 pinsel: $(OBJFILES)
 	$(CC) -o $@ $^ -Wall $(LDLIBS) -export-dynamic
 
-$(RESFILE): $(DATADIR)/data.gresource.xml $(UIFILES)
+$(RESFILE): $(DATADIR)/data.gresource.xml $(DATAFILES)
 	glib-compile-resources --target $@ --generate-source $<
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c

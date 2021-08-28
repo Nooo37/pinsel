@@ -9,9 +9,12 @@ local function table_contains(t, v)
     return false
 end
 
-pinsel.on_key = function(keypress)
+pinsel.on_key = function(key, mod)
+    -- print("test", key, mod.control, mod.alt)
+    if mod.alt then key = "M-" .. key end
+    if mod.control then key = "C-" .. key end
     for _, entry in ipairs(keys) do
-        if entry[1] == keypress then entry[2]() return end
+        if entry[1] == key then entry[2]() return end
     end
 end
 

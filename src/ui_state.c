@@ -1,5 +1,6 @@
 #include <gtk/gtk.h>
 
+#include "pango/pango-font.h"
 #include "ui_state.h"
 #include "gui.h"
 #include "pinsel.h"
@@ -7,6 +8,8 @@
 
 static UIGeometry geo;
 static Mode mode;
+static int width = 10;
+PangoFontDescription *font;
 GdkRGBA color1; // primary color
 GdkRGBA color2; // secondary color
 
@@ -121,6 +124,26 @@ extern void ui_switch_colors()
     temp = color1;
     color1 = color2;
     color2 = temp;
+}
+
+extern void ui_set_width(int temp)
+{
+    width = temp;
+}
+
+extern int ui_get_width()
+{
+    return width;
+}
+
+extern PangoFontDescription* ui_get_font()
+{
+    return font;
+}
+
+extern void ui_set_font(PangoFontDescription *new_font)
+{
+    font = new_font;
 }
 
 extern void ui_perform_action(Action* action)

@@ -57,4 +57,12 @@ extern GdkRGBA* ui_get_color2();
 
 extern void ui_switch_colors();
 
+extern void ui_set_width(int temp);
+
+extern int ui_get_width();
+
+extern PangoFontDescription* ui_get_font();
+
+extern void ui_set_font(PangoFontDescription *new_font);
+
 #endif

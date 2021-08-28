@@ -21,8 +21,6 @@ extern GdkPixbuf* pix_undo_all();
 
 extern void pix_perform_action(Action *action);
 
-extern void pix_undo_temrporarily_action();
-
 extern char* pix_get_dest();
 
 extern gboolean pix_is_saved();
