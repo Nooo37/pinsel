@@ -1,6 +1,21 @@
-pinsel = pinsel_api
+pinsel = pinsel
 
-local keys
+local keys = {}
+
+pinsel.move = function(delta_x, delta_y)
+    local geo = pinsel.get_geo()
+    pinsel.set_geo({
+        offset_x = geo.offset_x + delta_x,
+        offset_y = geo.offset_y + delta_y,
+    })
+end
+
+pinsel.zoom = function(delta)
+    local geo = pinsel.get_geo()
+    pinsel.set_geo({ scale = geo.scale + delta })
+end
+
+pinsel.set_keys = function(t) keys = t end
 
 local function table_contains(t, v)
     for _, w in ipairs(t) do
@@ -9,21 +24,10 @@ local function table_contains(t, v)
     return false
 end
 
-pinsel.on_key = function(key, mod)
-    -- print("test", key, mod.control, mod.alt)
-    if mod.alt then key = "M-" .. key end
-    if mod.control then key = "C-" .. key end
-    for _, entry in ipairs(keys) do
-        if entry[1] == key then entry[2]() return end
-    end
-end
-
-pinsel.set_keys = function(t) keys = t end
-
 local function get_all_categories()
     local res = { }
     for _, key in ipairs(keys) do
-        if key[3] then
+        if key and key[3] then
             if not table_contains(res, key[3]) then
                     res[#res + 1] = key[3]
             end
@@ -67,7 +71,7 @@ function pinsel.get_shortcut_dialog()
         <property name="title" translatable="yes" context="shortcut window">]] .. cat .. [[</property>
         ]]
         for _, key in ipairs(keys) do
-            if key[3] and key[3] == cat then
+            if key and key[3] and key[3] == cat and key[1] ~= "scroll_up" and key[1] ~= "scroll_down" then
                 local desc = key[4] or "no description provided"
                 res = res .. [[
                     <child>
@@ -94,4 +98,6 @@ function pinsel.get_shortcut_dialog()
     ]]
     return res
 end
+
+pinsel.history_limit = 20
 

@@ -13,14 +13,12 @@ typedef struct {
     GList *positions;
     GdkRGBA *color;
     int width;
-    /* gboolean is_temporary; */
 } BrushAction;
 
 typedef struct {
     GList *positions;
     float alpha;
     int width;
-    /* gboolean is_temporary; */
 } EraseAction;
 
 typedef struct {
@@ -29,13 +27,22 @@ typedef struct {
     GdkRGBA *color;
     int x;
     int y;
-    /* gboolean is_temporary; */
 } TextAction;
+
+typedef struct {
+    float scale;
+    int mid_x;
+    int mid_y;
+    int offset_x;
+    int offset_y;
+    int area_width;
+    int area_height;
+} UIGeometry;
 
 typedef enum {
     // pixbuf related actions
     DISCARD,
-    FLUSH,
+    APPLY,
     BRUSH_ACTION,
     ERASE_ACTION,
     TEXT_ACTION,
@@ -48,17 +55,22 @@ typedef enum {
     UNDO_ALL,
     SAVE,
     // ui related actions
+    SAVE_AS,
+    OPEN,
+    TEXT_INPUT,
     SWITCH_COLORS,
     SET_COLOR1,
     SET_COLOR2,
     SWITCH_MODE,
     QUIT_UNSAFE,
+
+    SET_GEO,
+    //
     ZOOM,
     MOVE_HORIZONTALLY,
     MOVE_VERTICALLY,
     FIT_POSITION,
-    SAVE_AS,
-    OPEN
+
 } ActionType;
 
 typedef struct {
@@ -71,6 +83,7 @@ typedef struct {
         float zoom; /* ZOOM */
         int move; /* MOVE_HORIZONTALLY, MOVE_VERTICALLY */
         GdkRGBA color; /* SET_COLOR1, SET_COLOR2 */
+        UIGeometry geo; /* SET_GEO */
     };
 } Action;
 

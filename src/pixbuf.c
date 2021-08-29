@@ -8,7 +8,7 @@ static GdkPixbuf *displayed;
 static GdkPixbuf *original;
 static char* dest = NULL;
 static gboolean is_saved = FALSE;
-static int width, height;
+static int width, height, history_limit;
 
 static void copy_pix_to_displayed()
 {
@@ -28,13 +28,14 @@ static void update_geo()
     height = gdk_pixbuf_get_height(draw_layer);
 }
 
-extern void pix_init(GdkPixbuf *temp)
+extern void pix_init(GdkPixbuf *temp, int limit)
 {
     displayed = gdk_pixbuf_copy(temp);
     original = gdk_pixbuf_copy(temp);
     draw_layer = gdk_pixbuf_copy(temp);
+    history_limit = limit;
     update_geo();
-    history_init(draw_layer);
+    history_init(draw_layer, limit);
 }
 
 extern gboolean pix_has_undo()
@@ -118,37 +119,42 @@ extern void pix_load_new_image(char* filename)
         return;
     }
     history_free();
-    pix_init(temp);
+    pix_init(temp, history_limit);
     pix_set_dest(filename);
     g_object_unref(temp);
 }
 
 extern void pix_perform_action(Action *action)
 {
+    /* early return means: do not put the current state into history */
     switch (action->type) {
+        case APPLY: {
+                copy_displayed_to_pix();
+            } break;
         case DISCARD: {
-                    copy_pix_to_displayed();
-                } break;
-        case FLUSH: {
-                    copy_displayed_to_pix();
-                } break;
+                copy_pix_to_displayed();
+                return;
+            } break;
         case BRUSH_ACTION: {
                 g_object_unref(displayed);
                 GdkPixbuf *temp = pix_get_current();
                 displayed = perform_action_brush(action->brush, temp);
                 g_object_unref(temp);
+                return;
             } break;
         case ERASE_ACTION: { 
                 g_object_unref(displayed);
                 GdkPixbuf *temp = pix_get_current();
                 displayed = perform_action_erase(action->erase, temp);
                 g_object_unref(temp);
+                return;
             } break;
         case TEXT_ACTION: {
                 g_object_unref(displayed);
                 GdkPixbuf *temp = pix_get_current();
                 displayed = perform_action_text(action->text, temp);
                 g_object_unref(temp);
+                return;
             } break;
         case FLIP_HORIZONTALLY: {
                 GdkPixbuf *temp;
@@ -201,12 +207,14 @@ extern void pix_perform_action(Action *action)
                 draw_layer = history_undo_one();
                 copy_pix_to_displayed();
                 update_geo();
+                return;
             } break;
         case REDO: {
                 g_object_unref(draw_layer);
                 draw_layer = history_redo_one();
                 copy_pix_to_displayed();
                 update_geo();
+                return;
             } break;
         case UNDO_ALL: {
                 g_object_unref(draw_layer);
@@ -220,11 +228,7 @@ extern void pix_perform_action(Action *action)
         default:
             return;
     }
-    if (action->type != BRUSH_ACTION && action->type != ERASE_ACTION && 
-            action->type != TEXT_ACTION && action->type != DISCARD && 
-            action->type != UNDO && action->type != REDO) {
-        history_add_one(draw_layer);
-        is_saved = FALSE;
-    }
+    history_add_one(draw_layer);
+    is_saved = FALSE;
 }
 

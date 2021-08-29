@@ -2,10 +2,6 @@
 #define PINSEL_H
 
 #define SANE_SCALE_MARGIN 0.03
-#define DELTA_MOVE 20
-#define DELTA_ZOOM 0.04
-#define DELTA_RADIUS 2
-#define HISTORY_LIMIT 20
 #define VERSION "0.0.0"
 
 // just something to keep the argument parsing more readable

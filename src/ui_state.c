@@ -1,102 +1,42 @@
 #include <gtk/gtk.h>
 
-#include "pango/pango-font.h"
+#include "config.h"
 #include "ui_state.h"
 #include "gui.h"
-#include "pinsel.h"
 #include "utils.h"
 
 static UIGeometry geo;
 static Mode mode;
-static int width = 10;
-PangoFontDescription *font;
-GdkRGBA color1; // primary color
-GdkRGBA color2; // secondary color
+static GdkRGBA color1; // primary color
+static GdkRGBA color2; // secondary color
+static int width;
+static PangoFontDescription *font_desc;
+static char* text;
 
 extern void ui_state_init()
 {
     geo.scale = 1;
     geo.area_height = 0;
     geo.area_width = 0;
-    geo.mid_x = 0;
-    geo.mid_y = 0;
     geo.offset_x = 0;
     geo.offset_y = 0;
     mode = BRUSH;
 }
 
-extern void ui_set_area_width(int area_width)
+extern UIGeometry* ui_get_geo()
 {
-    geo.area_width = area_width;
-    geo.mid_x = (geo.area_width - pix_get_img_width() * geo.scale) / 2;
+    return &geo;
 }
 
-extern void ui_set_area_height(int area_height)
-{
-    geo.area_height = area_height;
-    geo.mid_y = (geo.area_height - pix_get_img_height() * geo.scale) / 2;
-}
-
-extern int ui_get_mid_x()
-{
-    return geo.mid_x;
-}
-
-extern int ui_get_mid_y()
-{
-    return geo.mid_y;
-}
-
-extern int ui_get_offset_x()
-{
-    return geo.offset_x;
-}
-
-extern int ui_get_offset_y()
-{
-    return geo.offset_y;
-}
-
-extern void ui_set_offset_x(int x)
-{
-    geo.offset_x = x;
-}
-
-extern void ui_set_offset_y(int y)
-{
-    geo.offset_y = y;
-}
-
-extern float ui_get_scale()
-{
-    return geo.scale;
-}
-
-
-extern void ui_set_scale(float scale)
-{
-    geo.scale = scale;
-}
-
-extern int ui_translate_x(int x)
-{
-    return (x - geo.offset_x - geo.mid_x) / geo.scale;
-}
-
-extern int ui_translate_y(int y)
-{
-    return (y - geo.offset_y - geo.mid_y) / geo.scale;
-}
-
-extern int ui_get_area_height()
-{
-    return geo.area_height;
-}
-
-extern int ui_get_area_width()
-{
-    return geo.area_width;
-}
+/* extern int ui_translate_x(int x) */
+/* { */
+/*     return (x - geo.offset_x - geo.mid_x) / geo.scale; */
+/* } */
+/*  */
+/* extern int ui_translate_y(int y) */
+/* { */
+/*     return (y - geo.offset_y - geo.mid_y) / geo.scale; */
+/* } */
 
 extern Mode ui_get_mode()
 {
@@ -124,6 +64,37 @@ extern void ui_switch_colors()
     temp = color1;
     color1 = color2;
     color2 = temp;
+}
+
+extern void ui_set_width(int new_width)
+{
+    width = new_width;
+}
+
+extern int ui_get_width()
+{
+    return width;
+}
+
+extern void ui_set_text(char* new_text)
+{
+    config_notify_text(new_text);
+    text = new_text;
+}
+
+extern char* ui_get_text()
+{
+    return text;
+}
+
+extern PangoFontDescription* ui_get_font()
+{
+    return font_desc;
+}
+
+extern void ui_set_font(PangoFontDescription *new_font)
+{
+    font_desc = new_font;
 }
 
 extern void ui_set_width(int temp)
@@ -162,7 +133,7 @@ extern void ui_perform_action(Action* action)
             geo.offset_x = 0;
             geo.offset_y = 0;
             geo.scale = get_sane_scale(pix_get_img_width(), pix_get_img_height(),
-                            ui_get_area_width(), ui_get_area_height());
+                            geo.area_width, geo.area_height);
         } break;
         case QUIT_UNSAFE: {
             gtk_main_quit();
@@ -184,6 +155,12 @@ extern void ui_perform_action(Action* action)
         } break;
         case SET_COLOR2: {
             color2 = action->color;
+        } break;
+        case TEXT_INPUT: {
+            gui_open_text_dialog();
+        } break;
+        case SET_GEO: {
+            geo = action->geo;
         } break;
         default:
             return;

@@ -3,36 +3,25 @@
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
 
+#include "gui.h"
 #include "config.h"
 #include "ui_state.h"
-#include "gui.h"
 #include "utils.h"
-#include "pinsel.h"
 
-// Gtk
-GdkDisplay *display;
-GdkSeat *seat;
-GdkDevice *device;
+static GdkDisplay *display;
+static GdkSeat *seat;
+static GdkDevice *device;
 
-GtkWidget *window;
-GtkWidget *canvas;
-GtkDialog *text_dialog;
-GtkButton *undo_button, *redo_button;
-GtkToggleButton *brush_toggle;
-GtkToggleButton *eraser_toggle;
-GtkToggleButton *text_toggle;
-GtkColorChooser *color_picker_primary;
-GtkColorChooser *color_picker_secondary;
-GtkAdjustment *radius_scale;
-
-// text tool
-gchar *text = "";
-int text_x = 20;
-int text_y = 20;
-
-// actions
-TextAction text_action;
-
+static GtkWidget *window;
+static GtkWidget *canvas;
+static GtkDialog *text_dialog;
+static GtkButton *undo_button, *redo_button;
+static GtkToggleButton *brush_toggle;
+static GtkToggleButton *eraser_toggle;
+static GtkToggleButton *text_toggle;
+static GtkColorChooser *color_picker_primary;
+static GtkColorChooser *color_picker_secondary;
+static GtkAdjustment *radius_scale;
 
 static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
 {
@@ -50,8 +39,11 @@ static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
 static void update_drawing_area() 
 {
     // update geometry
-    ui_set_area_height(gtk_widget_get_allocated_height(canvas));
-    ui_set_area_width(gtk_widget_get_allocated_width(canvas));
+    UIGeometry *geo = ui_get_geo();
+    geo->area_height = gtk_widget_get_allocated_height(canvas);
+    geo->area_width = gtk_widget_get_allocated_width(canvas);
+    geo->mid_x = (geo->area_width - pix_get_img_width() * geo->scale) / 2;
+    geo->mid_y = (geo->area_height - pix_get_img_height() * geo->scale) / 2;
 
     // initalize stuff
     cairo_region_t* cairo_region = cairo_region_create();
@@ -66,9 +58,8 @@ static void update_drawing_area()
     /* gtk_widget_queue_draw(canvas); */
 
     // draw
-    cairo_translate(cr, ui_get_mid_x() + ui_get_offset_x(), 
-                    ui_get_mid_y() + ui_get_offset_y());
-    cairo_scale(cr, ui_get_scale(), ui_get_scale());
+    cairo_translate(cr, geo->mid_x + geo->offset_x, geo->mid_y + geo->offset_y);
+    cairo_scale(cr, geo->scale, geo->scale);
     GdkPixbuf* temp = pix_get_displayed();
     gdk_cairo_set_source_pixbuf(cr, temp, 0, 0);
     cairo_paint(cr);
@@ -93,24 +84,24 @@ static void set_title_saved(gboolean is_saved)
     }
 }
 
-void temporary_text_display()
+static Modifiers convert_gdk_to_modifiers(GdkModifierType event)
 {
-    TextAction temp_text_action;
-    temp_text_action.text = text;
-    temp_text_action.font = ui_get_font();
-    temp_text_action.color = ui_get_color1();
-    temp_text_action.x = text_x;
-    temp_text_action.y = text_y;
-    Action temp_action;
-    temp_action.type = TEXT_ACTION;
-    temp_action.text = &temp_text_action;
-    pix_perform_action(&temp_action);
-    update_drawing_area();
+    Modifiers mods;
+    mods.shift = event & GDK_SHIFT_MASK;
+    mods.control = event & GDK_CONTROL_MASK;
+    mods.alt = event & GDK_MOD1_MASK;
+    mods.button1 = event & GDK_BUTTON1_MASK;
+    mods.button2 = event & GDK_BUTTON2_MASK;
+    mods.button3 = event & GDK_BUTTON3_MASK;
+    return mods;
 }
 
-static void update_width()
+static gboolean on_draw(GtkWidget *da, 
+                        cairo_t *cr, 
+                        gpointer data)
 {
-    gtk_adjustment_set_value(radius_scale, ui_get_width());
+    update_drawing_area();
+    return FALSE;
 }
 
 static void redraw_popup(GtkWidget *temp, gpointer popup)
@@ -157,36 +148,6 @@ static void rotate_left()
 static void rotate_right()
 {
     config_perform_self_contained_action(ROTATE_CLOCKWISE);
-    update_drawing_area();
-}
-
-static void quit_text()
-{
-    gtk_widget_hide((GtkWidget*) text_dialog);
-}
-
-static void quit_text_tool_ok()
-{
-    quit_text();
-    TextAction temp_text_action;
-    temp_text_action.text = text;
-    temp_text_action.font = ui_get_font();
-    temp_text_action.color = ui_get_color1();
-    temp_text_action.x = text_x;
-    temp_text_action.y = text_y;
-    Action temp_action;
-    temp_action.type = TEXT_ACTION;
-    temp_action.text = &temp_text_action;
-    pix_perform_action(&temp_action);
-    update_drawing_area();
-}
-
-static void quit_text_tool_cancel()
-{
-    quit_text();
-    Action temp;
-    temp.type = DISCARD;
-    config_perform_action(&temp);
     update_drawing_area();
 }
 
@@ -262,14 +223,15 @@ static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
     GtkTextIter start, end;
 
     gtk_text_buffer_get_bounds(textbuffer, &start, &end);
-    text = gtk_text_buffer_get_text(textbuffer, &start, &end, TRUE);
-    temporary_text_display();
+    ui_set_text(gtk_text_buffer_get_text(textbuffer, &start, &end, TRUE));
+    update_drawing_area();
 }
 
 static void on_font_set(GtkFontButton* button, gpointer user_data)
 {
     ui_set_font(gtk_font_chooser_get_font_desc((GtkFontChooser*) button));
-    temporary_text_display();
+    config_notify_text(ui_get_text()); // temporary hack to update the drawing area on font change
+    update_drawing_area();
 }
 
 static void change_radius(GtkAdjustment *adjust)
@@ -343,6 +305,12 @@ extern void gui_open_new_image()
     gtk_widget_destroy (dialog);
 }
 
+extern void gui_open_text_dialog()
+{
+    gtk_widget_show(GTK_WIDGET(text_dialog));
+    gtk_window_set_keep_above(GTK_WINDOW(text_dialog), TRUE);
+}
+
 
 static void open_new_image(GtkWidget *temp, GtkPopover *popover)
 {
@@ -370,7 +338,6 @@ static void open_shortcuts_dialog(GtkWidget *temp, gpointer shortcuts_dialog)
     g_object_unref(builder);
 }
 
-
 static void update_color_buttons()
 {
     gtk_color_chooser_set_rgba(color_picker_primary, ui_get_color1());
@@ -385,34 +352,107 @@ static void update_toggle_buttons()
     gtk_toggle_button_set_active(brush_toggle, mode == BRUSH);
 }
 
-static void on_click(GtkWidget      *widget,
-                     GdkEventButton *event)
+static void quit_text_tool_ok()
+{
+    gtk_widget_hide((GtkWidget*) text_dialog);
+    config_notify_text_close(TRUE);
+    update_drawing_area();
+    update_toggle_buttons();
+    update_color_buttons();
+    set_title_saved(pix_is_saved());
+}
+
+static void quit_text_tool_cancel()
+{
+    gtk_widget_hide((GtkWidget*) text_dialog);
+    config_notify_text_close(FALSE);
+    update_drawing_area();
+    update_toggle_buttons();
+    update_color_buttons();
+    set_title_saved(pix_is_saved());
+}
+
+
+static int translate_x(int x)
+{
+    UIGeometry *geo = ui_get_geo();
+    return (x - geo->offset_x - geo->mid_x) / geo->scale;
+}
+
+static int translate_y(int y)
+{
+    UIGeometry *geo = ui_get_geo();
+    return (y - geo->offset_y - geo->mid_y) / geo->scale;
+}
+
+static gboolean on_click(GtkWidget      *widget,
+                         GdkEventButton *event)
 {
     int x, y, x_translated, y_translated;
 
     x = event->x;
     y = event->y;
-    x_translated = ui_translate_x(x);
-    y_translated = ui_translate_y(y);
+    x_translated = translate_x(x);
+    y_translated = translate_y(y);
 
-    Modifiers mods = convert_gdk_to_modifiers(event->state);
-    config_perform_click_binding(event->button, x_translated, y_translated, mods);
+    Modifiers mod = convert_gdk_to_modifiers(event->state);
+    config_perform_click_event(event->button, x_translated, y_translated, mod);
     update_drawing_area();
+    return TRUE;
 }
 
-static void on_key_press(GtkWidget *widget,
-                         GdkEventKey *event,
-                         gpointer user_data) 
+static gboolean on_motion(GtkWidget *widget,
+                          GdkEventMotion *event)
 {
-    // TODO: preprocessing for non-letter keys needed
-    char *key = g_strdup_printf("%c", (char) event->keyval);
-    Modifiers mods = convert_gdk_to_modifiers(event->state);
-    config_perform_key_binding(key, mods);
+    int x, y, x_translated, y_translated;
+    GdkModifierType state;
+
+    // get coords
+    if (event->is_hint) {
+        gdk_window_get_device_position (event->window, device, &x, &y, &state);
+    } else {
+        x = event->x;
+        y = event->y;
+        state = event->state;
+    }
+
+    x_translated = translate_x(x);
+    y_translated = translate_y(y);
+
+    Modifiers mod = convert_gdk_to_modifiers(state);
+    config_perform_motion_event(x_translated, y_translated, mod);
+
+    update_drawing_area();
+    return TRUE;
+}
+
+static gboolean on_scroll(GtkWidget *widget,
+                          GdkEventScroll *event,
+                          gpointer data)
+{
+    Modifiers mod = convert_gdk_to_modifiers(event->state);
+    if (event->direction == GDK_SCROLL_UP)
+        config_perform_key_event("scroll_up", mod);
+    else if (event->direction == GDK_SCROLL_DOWN)
+        config_perform_key_event("scroll_down", mod);
+    update_drawing_area();
+    return TRUE;
+}
+
+static gboolean on_key(GtkWidget *widget,
+                       GdkEventKey *event,
+                       gpointer user_data)
+{
+    char key[0];
+    key[0] = (char) event->keyval;
+    Modifiers mod = convert_gdk_to_modifiers(event->state);
+    config_perform_key_event(key, mod);
     update_drawing_area();
     update_toggle_buttons();
     update_color_buttons();
     update_width();
     set_title_saved(pix_is_saved());
+    return TRUE;
 }
 
 static void on_scroll( GtkWidget *widget,
@@ -486,7 +526,7 @@ extern int gui_init(gboolean is_on_top,
     g_signal_connect(G_OBJECT(window), "destroy", 
                     G_CALLBACK(gtk_main_quit), NULL);
     g_signal_connect(G_OBJECT(window), "key-press-event", 
-                    G_CALLBACK(on_key_press), NULL);
+                    G_CALLBACK(on_key), NULL);
 
     gtk_widget_add_events(window, GDK_KEY_PRESS_MASK
                     | GDK_KEY_RELEASE_MASK);
@@ -635,7 +675,5 @@ extern int gui_init(gboolean is_on_top,
     fit_zoom();
     ui_set_font(gtk_font_chooser_get_font_desc(GTK_FONT_CHOOSER(font_button)));
 
-    text_action.font = ui_get_font();
-    text_action.color = ui_get_color1();
     return 1;
 }

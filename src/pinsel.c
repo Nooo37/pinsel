@@ -2,8 +2,8 @@
 #include <gio/gunixoutputstream.h>
 #include <gio/gunixinputstream.h>
 #include <stdlib.h>
+#include <unistd.h>
 
-#include "gio/gmenumodel.h"
 #include "pinsel.h"
 #include "config.h"
 #include "pixbuf.h"
@@ -30,16 +30,24 @@ int main(int argc, char *argv[])
     }
 
     char* config_file_location = "init.lua";
-    /* if (getenv("XDG_CONFIG_HOME")) */
-    /*     config_file_location = getenv("XDG_CONFIG_HOME"); */
-    /* else if (getenv("HOME")) { */
-    /*     char *home_dir = getenv("HOME"); */
-    /*     config_file_location = g_strdup_printf("%s%s", home_dir, ".config"); */
-    /* } */
-    /* config_file_location = g_strdup_printf("%s/pinsel/init.lua", config_file_location); */
+    gboolean use_default_config = FALSE;
+    if (getenv("XDG_CONFIG_HOME"))
+        config_file_location = getenv("XDG_CONFIG_HOME");
+    else if (getenv("HOME")) {
+        char *home_dir = getenv("HOME");
+        config_file_location = g_strdup_printf("%s/%s", home_dir, ".config");
+    }
+    config_file_location = g_strdup_printf("%s/pinsel/init.lua", config_file_location);
+
+    if (access(config_file_location, R_OK) != 0)
+        use_default_config = TRUE;
+
+    /* printf("%s", config_file_location); */
         
-    if (!config_init(config_file_location))
+    if (!config_init(config_file_location, use_default_config)) {
+        fprintf(stderr, "Failed to initalize configuration\n");
         return 1;
+    }
 
 
     // handle all the other command line arguments
@@ -95,7 +103,8 @@ int main(int argc, char *argv[])
         return 1;
     }
 
-    pix_init(init_pix);
+    int limit = config_get_history_limit();
+    pix_init(init_pix, limit);
     pix_set_dest(init_dest);
 
     gtk_init(&argc, &argv);

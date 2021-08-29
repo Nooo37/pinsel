@@ -21,4 +21,6 @@ extern void gui_save();
 
 extern void gui_open_new_image();
 
+extern void gui_open_text_dialog();
+
 #endif
