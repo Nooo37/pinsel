@@ -102,7 +102,6 @@ extern gboolean pix_save()
         gdk_pixbuf_save(pix_get_current(), dest, "png", &err, NULL);
         if (err) {
             fprintf(stderr, "Failed to save image:\n%s\n", err->message);
-            is_saved = TRUE;
             g_error_free(err);
             return FALSE;
         } else {
@@ -227,7 +226,8 @@ extern void pix_perform_action(Action *action)
                 update_geo();
             } break;
         case SAVE: {
-                pix_save();
+                is_saved = pix_save();
+                return;
             } break;
         default:
             return;
