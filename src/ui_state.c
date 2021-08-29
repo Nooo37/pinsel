@@ -18,6 +18,8 @@ extern void ui_state_init()
     geo.scale = 1;
     geo.area_height = 0;
     geo.area_width = 0;
+    geo.img_height = 0;
+    geo.img_width = 0;
     geo.offset_x = 0;
     geo.offset_y = 0;
     mode = BRUSH;

@@ -37,6 +37,8 @@ typedef struct {
     int offset_y;
     int area_width;
     int area_height;
+    int img_width;
+    int img_height;
 } UIGeometry;
 
 typedef enum {

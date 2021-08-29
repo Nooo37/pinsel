@@ -24,14 +24,16 @@ static GtkColorChooser *color_picker_secondary;
 static GtkAdjustment *radius_scale;
 
 // updates the drawing area based on global state
-static void update_drawing_area() 
+extern void update_drawing_area() 
 {
     // update geometry
     UIGeometry *geo = ui_get_geo();
     geo->area_height = gtk_widget_get_allocated_height(canvas);
     geo->area_width = gtk_widget_get_allocated_width(canvas);
-    geo->mid_x = (geo->area_width - pix_get_img_width() * geo->scale) / 2;
-    geo->mid_y = (geo->area_height - pix_get_img_height() * geo->scale) / 2;
+    geo->img_height = pix_get_img_height();
+    geo->img_width = pix_get_img_width();
+    geo->mid_x = (geo->area_width - geo->img_width * geo->scale) / 2;
+    geo->mid_y = (geo->area_height - geo->img_height * geo->scale) / 2;
 
     // initalize stuff
     cairo_region_t* cairo_region = cairo_region_create();

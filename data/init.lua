@@ -167,6 +167,6 @@ end
 
 pinsel.set_color1(0, 0, 0, 1)
 pinsel.set_color2(0.5, 0, 0, 0.5)
-pinsel.set_width(20)
+pinsel.set_width(10)
 pinsel.history_limit = 20
 

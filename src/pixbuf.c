@@ -140,22 +140,22 @@ extern void pix_perform_action(Action *action)
                 return;
             } break;
         case BRUSH_ACTION: {
+                GdkPixbuf *temp = gdk_pixbuf_copy(displayed);
                 g_object_unref(displayed);
-                GdkPixbuf *temp = pix_get_current();
                 displayed = perform_action_brush(action->brush, temp);
                 g_object_unref(temp);
                 return;
             } break;
         case ERASE_ACTION: { 
+                GdkPixbuf *temp = gdk_pixbuf_copy(displayed);
                 g_object_unref(displayed);
-                GdkPixbuf *temp = pix_get_current();
                 displayed = perform_action_erase(action->erase, temp);
                 g_object_unref(temp);
                 return;
             } break;
         case TEXT_ACTION: {
+                GdkPixbuf *temp = gdk_pixbuf_copy(displayed);
                 g_object_unref(displayed);
-                GdkPixbuf *temp = pix_get_current();
                 displayed = perform_action_text(action->text, temp);
                 g_object_unref(temp);
                 return;

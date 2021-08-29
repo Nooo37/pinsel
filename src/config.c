@@ -9,6 +9,7 @@
 #include "ui_state.h"
 #include "pixbuf.h"
 #include "utils.h"
+#include "gui.h"
 
 static lua_State *L;
 static GList *coords = NULL;
@@ -58,6 +59,18 @@ static int config_get_geo(lua_State *L)
     lua_pushstring(L, "mid_y");
     lua_pushnumber(L, geo->mid_y);
     lua_settable(L, -3);
+    lua_pushstring(L, "img_width");
+    lua_pushnumber(L, geo->img_width);
+    lua_settable(L, -3);
+    lua_pushstring(L, "img_height");
+    lua_pushnumber(L, geo->img_height);
+    lua_settable(L, -3);
+    return 1;
+}
+
+static int config_update_drawing_area(lua_State *L)
+{
+    update_drawing_area();
     return 1;
 }
 
@@ -284,6 +297,18 @@ static int config_erase(lua_State *L)
     return 1;
 }
 
+static gboolean config_notify_tick(gpointer data)
+{
+    lua_settop(L, 0);
+    lua_getglobal(L, "pinsel");
+    lua_pushstring(L, "on_tick");
+    lua_gettable(L, -2);
+    if (lua_isnil(L, -1))
+        return TRUE;
+    lua_call(L, 0, 0);
+    return TRUE;
+}
+
 extern char* config_get_shortcut_ui()
 {
     lua_settop(L, 0);
@@ -307,6 +332,7 @@ extern int config_init(char* config_file, gboolean use_default_config)
     lua_newtable(L);
 
     static const luaL_Reg l[] = {
+        { "update",     config_update_drawing_area },
         { "discard",    config_discard },
         { "apply",      config_apply },
         { "path_clear", config_path_clear },
@@ -368,6 +394,8 @@ extern int config_init(char* config_file, gboolean use_default_config)
             return 0;
         }
     }
+
+    g_timeout_add(50, config_notify_tick, NULL);
 
     return 1;
 }

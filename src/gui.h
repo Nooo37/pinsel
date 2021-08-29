@@ -3,17 +3,10 @@
 
 #include <gtk/gtk.h>
 
-typedef enum {
-    BRUSHING,
-    LINING,
-    ERASING,
-    TEXTING,
-    DRAGGING,
-    IDLE
-} Activity;
-
 extern int gui_init(gboolean is_on_top, 
                     gboolean is_maximized);
+
+extern void update_drawing_area();
 
 extern void gui_save_as();
 
