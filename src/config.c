@@ -290,13 +290,13 @@ extern char* config_get_shortcut_ui()
     lua_getglobal(L, "pinsel");
     lua_pushstring(L, "get_shortcut_dialog");
     lua_gettable(L, -2);
-    if (lua_isnil(L, 1))
+    if (lua_isnil(L, -1))
         exit(1);
     lua_call(L, 0, 1);
     if (!lua_isstring(L, -1))
         exit(1);
-    const char* res = lua_tostring(L, -1);
-    return res;
+    const char* res = luaL_checkstring(L, -1);
+    return res; 
 }
 
 

@@ -59,6 +59,8 @@ keys = {
     { "C-S", pinsel.save_as, "Quit, Save, Open", "save the image to a (new) file" },
 }
 
+pinsel.set_keys(keys)
+
 pinsel.on_key = function(key, mod)
     if mod.alt then key = "M-" .. key end
     if mod.control then key = "C-" .. key end
@@ -166,5 +168,5 @@ end
 pinsel.set_color1(0, 0, 0, 1)
 pinsel.set_color2(0.5, 0, 0, 0.5)
 pinsel.set_width(20)
-pinsel.history_limit = 1
+pinsel.history_limit = 20
 
