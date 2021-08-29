@@ -10,7 +10,7 @@ local activity = "idle"
 
 local function is_brush(mod)
     local mode = pinsel.get_mode()
-    return (mode == BRUSH_MODE and mod.button1) or
+    return (mode == BRUSH_MODE and mod.button1 and not mod.shift) or
            (mode == ERASER_MODE and mod.button3)
 end
 local function is_erase(mod)
@@ -18,12 +18,15 @@ local function is_erase(mod)
     return (mode == BRUSH_MODE and mod.button3) or
            (mode == ERASER_MODE and mod.button1)
 end
+local function is_line(mod)
+    return pinsel.get_mode() == BRUSH_MODE and mod.button1 and mod.shift
+end
 local function is_drag(mod) return mod.button2 end
 local x_start, y_start
+local x_line, y_line
 local x_text = 0
 local y_text = 0
 local text = ""
-local is_texting = false
 
 mode_keys = {
     { "b", function() pinsel.set_mode(BRUSH_MODE); keys = temp_keys end },
@@ -36,7 +39,7 @@ keys = {
     { "l",   function() pinsel.move( - DELTA,       0 ) end, "Navigation", "move right" },
     { "j",   function() pinsel.move(       0, - DELTA ) end, "Navigation", "move down" },
     { "k",   function() pinsel.move(       0,   DELTA ) end, "Navigation", "move up" },
-    { "v",   function() pinsel.open_text_input(); pinsel.set_mode(TEXT_MODE) end, "Test", "test test" },
+    { "f", function() pinsel.set_geo({scale = 0.1, offset_x = 0, offset_y = 0}) end, "Test", "hey"},
     { "scroll_up", function() pinsel.zoom( ZOOM) end, "Navigation", "zoom in" },
     { "scroll_down", function() pinsel.zoom(-ZOOM) end, "Navigation", "zoom out" },
     { "u",   function() pinsel.rotate(false) end, "Manipulation", "rotate clockwise" },
@@ -68,11 +71,11 @@ pinsel.on_click = function(b, x, y, mod)
     if pinsel.get_mode() == TEXT_MODE then
         x_text = x
         y_text = y
-        if is_texting then
+        if activity == "text" then
             pinsel.discard()
             pinsel.text(text, x_text, y_text)
         else
-            is_texting = true
+            activity = "text"
             pinsel.open_text_input()
         end
     end
@@ -83,13 +86,10 @@ pinsel.on_motion = function(x, y, mod)
     if is_erase(mod) then activity = "erase" end
 
     if activity == "brush" then
-        if is_brush(mod) then
-            pinsel.discard()
-            pinsel.path_add(x, y)
-            pinsel.draw()
-        else
-            pinsel.discard()
-            pinsel.draw()
+        pinsel.discard()
+        pinsel.path_add(x, y)
+        pinsel.draw()
+        if not is_brush(mod) then
             pinsel.apply()
             pinsel.path_clear()
             activity = "idle"
@@ -97,13 +97,28 @@ pinsel.on_motion = function(x, y, mod)
     end
 
     if activity == "erase" then
-        if is_erase(mod) then
-            pinsel.discard()
-            pinsel.path_add(x, y)
-            pinsel.erase()
-        else
-            pinsel.discard()
-            pinsel.erase()
+        pinsel.discard()
+        pinsel.path_add(x, y)
+        pinsel.erase()
+        if not is_erase(mod) then
+            pinsel.apply()
+            pinsel.path_clear()
+            activity = "idle"
+        end
+    end
+
+    if is_line(mod) or activity == "line" then
+        if is_line(mod) and activity ~= "line" then
+            x_line = x
+            y_line = y
+            activity = "line"
+        end
+        pinsel.discard()
+        pinsel.path_clear()
+        pinsel.path_add(x_line, y_line)
+        pinsel.path_add(x, y)
+        pinsel.draw()
+        if not is_line(mod) then
             pinsel.apply()
             pinsel.path_clear()
             activity = "idle"
@@ -121,6 +136,15 @@ pinsel.on_motion = function(x, y, mod)
             activity = "idle"
         end
     end
+
+    if pinsel.get_mode() == TEXT_MODE and mod.button1 then
+        x_text = x
+        y_text = y
+        if activity == "text" then
+            pinsel.discard()
+            pinsel.text(text, x_text, y_text)
+        end
+    end
 end
 
 pinsel.on_text_change = function(t)
@@ -130,11 +154,11 @@ end
 
 pinsel.on_text_close = function(accepted)
     pinsel.discard()
-    print("hey")
     if accepted then
         pinsel.text(text, x_text, y_text)
         pinsel.apply()
-        is_texting = false
+        pinsel.set_mode(BRUSH_MODE)
+        activity = "idle"
         text = ""
     end
 end

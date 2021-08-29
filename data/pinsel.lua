@@ -2,6 +2,19 @@ pinsel = pinsel
 
 local keys
 
+pinsel.move = function(delta_x, delta_y)
+    local geo = pinsel.get_geo()
+    pinsel.set_geo({
+        offset_x = geo.offset_x + delta_x,
+        offset_y = geo.offset_y + delta_y,
+    })
+end
+
+pinsel.zoom = function(delta)
+    local geo = pinsel.get_geo()
+    pinsel.set_geo({ scale = geo.scale + delta })
+end
+
 local function table_contains(t, v)
     for _, w in ipairs(t) do
         if w == v then return true end

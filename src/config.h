@@ -12,7 +12,7 @@ typedef struct {
     gboolean alt;
 } Modifiers;
 
-extern int config_init();
+extern int config_init(char* config_file_location, gboolean use_default_config);
 
 extern void config_perform_action(Action *action);
 

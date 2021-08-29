@@ -3,59 +3,35 @@
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
 
+#include "gui.h"
 #include "config.h"
 #include "ui_state.h"
-#include "gui.h"
 #include "utils.h"
-#include "pinsel.h"
 
-// global state. I hope that is how one does C
-/* Mode mode = BRUSH; */
-Activity activity = IDLE;
+static GdkDisplay *display;
+static GdkSeat *seat;
+static GdkDevice *device;
 
-// Gtk
-GdkDisplay *display;
-GdkSeat *seat;
-GdkDevice *device;
-
-GtkWidget *window;
-GtkWidget *canvas;
-GtkDialog *text_dialog;
-GtkButton *undo_button, *redo_button;
-GtkToggleButton *brush_toggle;
-GtkToggleButton *eraser_toggle;
-GtkToggleButton *text_toggle;
-GtkColorChooser *color_picker_primary;
-GtkColorChooser *color_picker_secondary;
-GtkAdjustment *radius_scale;
-
-// brush settings
-/* int radius = 10; */
-GList *coords = NULL;
-coord_t *start_line = NULL;
-
-// mouse dragging
-int dragstart_x = 0;
-int dragstart_y = 0;
-int offset_old_x = 0;
-int offset_old_y = 0;
-
-// text tool
-gchar *text = "";
-int text_x = 20;
-int text_y = 20;
-/* PangoFontDescription *font_desc; */
-
-// actions
-TextAction text_action;
-
+static GtkWidget *window;
+static GtkWidget *canvas;
+static GtkDialog *text_dialog;
+static GtkButton *undo_button, *redo_button;
+static GtkToggleButton *brush_toggle;
+static GtkToggleButton *eraser_toggle;
+static GtkToggleButton *text_toggle;
+static GtkColorChooser *color_picker_primary;
+static GtkColorChooser *color_picker_secondary;
+static GtkAdjustment *radius_scale;
 
 // updates the drawing area based on global state
 static void update_drawing_area() 
 {
     // update geometry
-    ui_set_area_height(gtk_widget_get_allocated_height(canvas));
-    ui_set_area_width(gtk_widget_get_allocated_width(canvas));
+    UIGeometry *geo = ui_get_geo();
+    geo->area_height = gtk_widget_get_allocated_height(canvas);
+    geo->area_width = gtk_widget_get_allocated_width(canvas);
+    geo->mid_x = (geo->area_width - pix_get_img_width() * geo->scale) / 2;
+    geo->mid_y = (geo->area_height - pix_get_img_height() * geo->scale) / 2;
 
     // initalize stuff
     cairo_region_t* cairo_region = cairo_region_create();
@@ -70,9 +46,8 @@ static void update_drawing_area()
     /* gtk_widget_queue_draw(canvas); */
 
     // draw
-    cairo_translate(cr, ui_get_mid_x() + ui_get_offset_x(), 
-                    ui_get_mid_y() + ui_get_offset_y());
-    cairo_scale(cr, ui_get_scale(), ui_get_scale());
+    cairo_translate(cr, geo->mid_x + geo->offset_x, geo->mid_y + geo->offset_y);
+    cairo_scale(cr, geo->scale, geo->scale);
     GdkPixbuf* temp = pix_get_displayed();
     gdk_cairo_set_source_pixbuf(cr, temp, 0, 0);
     cairo_paint(cr);
@@ -165,20 +140,6 @@ static void rotate_right()
     update_drawing_area();
 }
 
-static void quit_text_tool_ok()
-{
-    gtk_widget_hide((GtkWidget*) text_dialog);
-    config_notify_text_close(TRUE);
-    update_drawing_area();
-}
-
-static void quit_text_tool_cancel()
-{
-    gtk_widget_hide((GtkWidget*) text_dialog);
-    config_notify_text_close(FALSE);
-    update_drawing_area();
-}
-
 static void update_color_primary(GtkButton *button, gpointer user_data)
 {
     GtkColorChooser *chooser = (GtkColorChooser*) user_data;
@@ -258,6 +219,7 @@ static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
 static void on_font_set(GtkFontButton* button, gpointer user_data)
 {
     ui_set_font(gtk_font_chooser_get_font_desc((GtkFontChooser*) button));
+    config_notify_text(ui_get_text()); // temporary hack to update the drawing area on font change
     update_drawing_area();
 }
 
@@ -335,6 +297,7 @@ extern void gui_open_new_image()
 extern void gui_open_text_dialog()
 {
     gtk_widget_show(GTK_WIDGET(text_dialog));
+    gtk_window_set_keep_above(GTK_WINDOW(text_dialog), TRUE);
 }
 
 
@@ -378,6 +341,39 @@ static void update_toggle_buttons()
     gtk_toggle_button_set_active(brush_toggle, mode == BRUSH);
 }
 
+static void quit_text_tool_ok()
+{
+    gtk_widget_hide((GtkWidget*) text_dialog);
+    config_notify_text_close(TRUE);
+    update_drawing_area();
+    update_toggle_buttons();
+    update_color_buttons();
+    set_title_saved(pix_is_saved());
+}
+
+static void quit_text_tool_cancel()
+{
+    gtk_widget_hide((GtkWidget*) text_dialog);
+    config_notify_text_close(FALSE);
+    update_drawing_area();
+    update_toggle_buttons();
+    update_color_buttons();
+    set_title_saved(pix_is_saved());
+}
+
+
+static int translate_x(int x)
+{
+    UIGeometry *geo = ui_get_geo();
+    return (x - geo->offset_x - geo->mid_x) / geo->scale;
+}
+
+static int translate_y(int y)
+{
+    UIGeometry *geo = ui_get_geo();
+    return (y - geo->offset_y - geo->mid_y) / geo->scale;
+}
+
 static gboolean on_click(GtkWidget      *widget,
                          GdkEventButton *event)
 {
@@ -385,8 +381,8 @@ static gboolean on_click(GtkWidget      *widget,
 
     x = event->x;
     y = event->y;
-    x_translated = ui_translate_x(x);
-    y_translated = ui_translate_y(y);
+    x_translated = translate_x(x);
+    y_translated = translate_y(y);
 
     Modifiers mod = convert_gdk_to_modifiers(event->state);
     config_perform_click_event(event->button, x_translated, y_translated, mod);
@@ -409,8 +405,8 @@ static gboolean on_motion(GtkWidget *widget,
         state = event->state;
     }
 
-    x_translated = ui_translate_x(x);
-    y_translated = ui_translate_y(y);
+    x_translated = translate_x(x);
+    y_translated = translate_y(y);
 
     Modifiers mod = convert_gdk_to_modifiers(state);
     config_perform_motion_event(x_translated, y_translated, mod);
@@ -625,7 +621,5 @@ extern int gui_init(gboolean is_on_top,
     fit_zoom();
     ui_set_font(gtk_font_chooser_get_font_desc(GTK_FONT_CHOOSER(font_button)));
 
-    text_action.font = ui_get_font();
-    text_action.color = ui_get_color1();
     return 1;
 }

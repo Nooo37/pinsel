@@ -19,7 +19,7 @@ extern void config_perform_action(Action *action)
         case ZOOM: case MOVE_HORIZONTALLY: case MOVE_VERTICALLY:
         case FIT_POSITION: case QUIT_UNSAFE: case SAVE_AS: case OPEN:
         case SWITCH_MODE: case SWITCH_COLORS: case SET_COLOR1: case SET_COLOR2:
-        case TEXT_INPUT:
+        case TEXT_INPUT: case SET_GEO:
             ui_perform_action(action);
         default:
             pix_perform_action(action);
@@ -33,27 +33,52 @@ extern void config_perform_self_contained_action(ActionType type)
     config_perform_action(&temp);
 }
 
-static int config_zoom(lua_State *L)
+static int config_get_geo(lua_State *L)
 {
-    double zoom = luaL_checknumber(L, 1);
-    Action temp;
-    temp.type = ZOOM;
-    temp.zoom = zoom;
-    config_perform_action(&temp);
+    UIGeometry *geo = ui_get_geo();
+    lua_newtable(L);
+    lua_pushstring(L, "scale");
+    lua_pushnumber(L, geo->scale);
+    lua_settable(L, -3);
+    lua_pushstring(L, "offset_x");
+    lua_pushnumber(L, geo->offset_x);
+    lua_settable(L, -3);
+    lua_pushstring(L, "offset_y");
+    lua_pushnumber(L, geo->offset_y);
+    lua_settable(L, -3);
+    lua_pushstring(L, "area_width");
+    lua_pushnumber(L, geo->area_width);
+    lua_settable(L, -3);
+    lua_pushstring(L, "area_height");
+    lua_pushnumber(L, geo->area_height);
+    lua_settable(L, -3);
+    lua_pushstring(L, "mid_x");
+    lua_pushnumber(L, geo->mid_x);
+    lua_settable(L, -3);
+    lua_pushstring(L, "mid_y");
+    lua_pushnumber(L, geo->mid_y);
+    lua_settable(L, -3);
     return 1;
 }
 
-static int config_move(lua_State *L)
+static int config_set_geo(lua_State *L)
 {
-    double delta_y = luaL_checknumber(L, 1);
-    double delta_x = luaL_checknumber(L, 2);
-    Action temp;
-    temp.type = MOVE_VERTICALLY;
-    temp.move = delta_x;
-    config_perform_action(&temp);
-    temp.type = MOVE_HORIZONTALLY;
-    temp.move = delta_y;
-    config_perform_action(&temp);
+    UIGeometry *geo = ui_get_geo();
+    lua_pushstring(L, "scale");
+    lua_gettable(L, -2);
+    if (lua_isnumber(L, -1))
+        geo->scale = luaL_checknumber(L, -1);
+    lua_pop(L, 1);
+    lua_pushstring(L, "offset_x");
+    lua_gettable(L, -2);
+    if (lua_isnumber(L, -1))
+        geo->offset_x = (int) luaL_checknumber(L, -1);
+    lua_pop(L, 1);
+    lua_pushstring(L, "offset_y");
+    lua_gettable(L, -2);
+    if (lua_isnumber(L, -1))
+        geo->offset_y = (int) luaL_checknumber(L, -1);
+    lua_pop(L, 1);
     return 1;
 }
 
@@ -275,7 +300,7 @@ extern char* config_get_shortcut_ui()
 }
 
 
-extern int config_init(char* config_file)
+extern int config_init(char* config_file, gboolean use_default_config)
 {
     L = luaL_newstate();
     luaL_openlibs(L);
@@ -289,10 +314,8 @@ extern int config_init(char* config_file)
         { "draw",       config_draw },
         { "text",       config_text },
         { "erase",      config_erase },
-        { "zoom",       config_zoom },
         { "rotate",     config_rotate},
         { "flip",       config_flip},
-        { "move",       config_move},
         { "undo_all",   config_undo_all },
         { "undo",       config_undo },
         { "redo",       config_redo },
@@ -300,14 +323,15 @@ extern int config_init(char* config_file)
         { "save_as",    config_save_as },
         { "open",       config_open },
         { "quit",       config_quit_unsafe },
+        { "get_mode",   config_get_mode },
         { "set_mode",   config_set_mode },
         { "set_width",  config_set_width },
         { "set_color1", config_set_color1 },
         { "set_color2", config_set_color2 },
         { "open_text_input",   config_text_input },
         { "switch_colors", config_switch_colors },
-        /* to be removed */
-        { "get_mode", config_get_mode },
+        { "set_geo", config_set_geo },
+        { "get_geo", config_get_geo },
         { NULL, NULL }
     };
 
@@ -327,12 +351,22 @@ extern int config_init(char* config_file)
     char buffer[buffer_size];
     gsize count;
     g_input_stream_read_all(pinsel_stream, buffer, buffer_size, &count, NULL,  NULL);
-
     luaL_dostring(L, buffer);
-    int status = luaL_dofile(L, config_file);
-    if (status) {
-        fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(L, -1));
-        return 0;
+
+    if (use_default_config) {
+        GInputStream* pinsel_stream = g_resources_open_stream("/data/init.lua", 
+                        G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
+        int buffer_size = 10000; // TODO: change
+        char config_buffer[buffer_size];
+        gsize count;
+        g_input_stream_read_all(pinsel_stream, config_buffer, buffer_size, &count, NULL,  NULL);
+        luaL_dostring(L, config_buffer);
+    } else {
+        int status = luaL_dofile(L, config_file);
+        if (status) {
+            fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(L, -1));
+            return 0;
+        }
     }
 
     return 1;
