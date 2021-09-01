@@ -8,7 +8,7 @@ UIFILES       := $(wildcard $(DATADIR)/*.ui) $(DATADIR)/help.txt
 RESFILE       := $(SRCDIR)/resources.c
 CFILES        := $(wildcard $(SRCDIR)/*.c) $(RESFILE)
 OBJFILES      := $(CFILES:$(SRCDIR)/%.c=$(OBJDIR)/%.o)
-LDLIBS        := $(shell pkg-config --cflags --libs gtk+-3.0 lua)
+LDLIBS        := $(shell pkg-config --cflags --libs gtk+-3.0 lua gio-unix-2.0)
 
 
 pinsel: $(OBJFILES)
