@@ -57,6 +57,7 @@ typedef enum {
     UNDO_ALL,
     SAVE,
     // ui related actions
+    UPDATE,
     SAVE_AS,
     OPEN,
     TEXT_INPUT,

@@ -1,4 +1,6 @@
 #include <stdlib.h>
+#include <stdio.h>
+#include <ctype.h>
 #include <libgen.h>
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
@@ -209,26 +211,6 @@ static void update_on_text_toggle(GtkToggleButton *text_toggle)
     }
 }
 
-static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
-{
-    GtkTextIter start, end;
-
-    gtk_text_buffer_get_bounds(textbuffer, &start, &end);
-    ui_set_text(gtk_text_buffer_get_text(textbuffer, &start, &end, TRUE));
-    update_drawing_area();
-}
-
-static void on_font_set(GtkFontButton* button, gpointer user_data)
-{
-    ui_set_font(gtk_font_chooser_get_font_desc((GtkFontChooser*) button));
-    config_notify_text(ui_get_text()); // temporary hack to update the drawing area on font change
-    update_drawing_area();
-}
-
-static void change_radius(GtkAdjustment *adjust)
-{
-    ui_set_width(gtk_adjustment_get_value(adjust));
-}
 
 static void undo()
 {
@@ -376,6 +358,36 @@ static int translate_y(int y)
     return (y - geo->offset_y - geo->mid_y) / geo->scale;
 }
 
+extern void gui_update()
+{
+    update_drawing_area();
+    update_toggle_buttons();
+    update_color_buttons();
+    set_title_saved(pix_is_saved());
+}
+
+static void update_on_text_buffer_change(GtkTextBuffer *textbuffer)
+{
+    GtkTextIter start, end;
+
+    gtk_text_buffer_get_bounds(textbuffer, &start, &end);
+    ui_set_text(gtk_text_buffer_get_text(textbuffer, &start, &end, TRUE));
+    gui_update();
+}
+
+static void on_font_set(GtkFontButton* button, gpointer user_data)
+{
+    ui_set_font(gtk_font_chooser_get_font_desc((GtkFontChooser*) button));
+    config_notify_text(ui_get_text()); // temporary hack to update the drawing area on font change
+    gui_update();
+}
+
+static void change_radius(GtkAdjustment *adjust)
+{
+    ui_set_width(gtk_adjustment_get_value(adjust));
+    gui_update();
+}
+
 static gboolean on_click(GtkWidget      *widget,
                          GdkEventButton *event)
 {
@@ -388,7 +400,7 @@ static gboolean on_click(GtkWidget      *widget,
 
     Modifiers mod = convert_gdk_to_modifiers(event->state);
     config_perform_click_event(event->button, x_translated, y_translated, mod);
-    update_drawing_area();
+    gui_update();
     return TRUE;
 }
 
@@ -413,7 +425,7 @@ static gboolean on_motion(GtkWidget *widget,
     Modifiers mod = convert_gdk_to_modifiers(state);
     config_perform_motion_event(x_translated, y_translated, mod);
 
-    update_drawing_area();
+    gui_update();
     return TRUE;
 }
 
@@ -426,7 +438,7 @@ static gboolean on_scroll(GtkWidget *widget,
         config_perform_key_event("scroll_up", mod);
     else if (event->direction == GDK_SCROLL_DOWN)
         config_perform_key_event("scroll_down", mod);
-    update_drawing_area();
+    gui_update();
     return TRUE;
 }
 
@@ -435,13 +447,10 @@ static gboolean on_key(GtkWidget *widget,
                        gpointer user_data)
 {
     char key[0];
-    key[0] = (char) event->keyval;
+    key[0] = tolower((char) event->keyval);
     Modifiers mod = convert_gdk_to_modifiers(event->state);
     config_perform_key_event(key, mod);
-    update_drawing_area();
-    update_toggle_buttons();
-    update_color_buttons();
-    set_title_saved(pix_is_saved());
+    gui_update();
     return TRUE;
 }
 

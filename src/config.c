@@ -9,7 +9,6 @@
 #include "ui_state.h"
 #include "pixbuf.h"
 #include "utils.h"
-#include "gui.h"
 
 static lua_State *L;
 static GList *coords = NULL;
@@ -20,7 +19,7 @@ extern void config_perform_action(Action *action)
         case ZOOM: case MOVE_HORIZONTALLY: case MOVE_VERTICALLY:
         case FIT_POSITION: case QUIT_UNSAFE: case SAVE_AS: case OPEN:
         case SWITCH_MODE: case SWITCH_COLORS: case SET_COLOR1: case SET_COLOR2:
-        case TEXT_INPUT: case SET_GEO:
+        case TEXT_INPUT: case SET_GEO: case UPDATE:
             ui_perform_action(action);
         default:
             pix_perform_action(action);
@@ -70,7 +69,7 @@ static int config_get_geo(lua_State *L)
 
 static int config_update_drawing_area(lua_State *L)
 {
-    update_drawing_area();
+    config_perform_self_contained_action(UPDATE);
     return 1;
 }
 
@@ -354,10 +353,10 @@ extern int config_init(char* config_file, gboolean use_default_config)
         { "set_width",  config_set_width },
         { "set_color1", config_set_color1 },
         { "set_color2", config_set_color2 },
-        { "open_text_input",   config_text_input },
+        { "set_geo",    config_set_geo },
+        { "get_geo",    config_get_geo },
+        { "open_text_input", config_text_input },
         { "switch_colors", config_switch_colors },
-        { "set_geo", config_set_geo },
-        { "get_geo", config_get_geo },
         { NULL, NULL }
     };
 

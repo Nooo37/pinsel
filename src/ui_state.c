@@ -30,16 +30,6 @@ extern UIGeometry* ui_get_geo()
     return &geo;
 }
 
-/* extern int ui_translate_x(int x) */
-/* { */
-/*     return (x - geo.offset_x - geo.mid_x) / geo.scale; */
-/* } */
-/*  */
-/* extern int ui_translate_y(int y) */
-/* { */
-/*     return (y - geo.offset_y - geo.mid_y) / geo.scale; */
-/* } */
-
 extern Mode ui_get_mode()
 {
     return mode;
@@ -102,6 +92,9 @@ extern void ui_set_font(PangoFontDescription *new_font)
 extern void ui_perform_action(Action* action)
 {
     switch(action->type) {
+        case UPDATE: {
+            gui_update();
+        } break;
         case ZOOM: {
             geo.scale += action->zoom;
         } break;
