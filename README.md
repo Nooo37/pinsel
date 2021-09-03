@@ -18,6 +18,11 @@ maim -s | pinsel -o $HOME/$(date).png | xclip -selection clipboard -t image/png
 
 First you select your screenshot through maim like you are used to. The result gets piped into pinsel where you can do annoatations and where you are free to save the image to `~/$(date).png` or not. If you don't want to annotate your image then you can still decide on whether to save it or not (which may add one key press in total to that workflow in the "worst case"). The end result gets piped to your clipboard for further usage.
 
+### Preview
+
+![](https://user-images.githubusercontent.com/70270606/132033128-792f54ae-90fb-4471-98b8-5a258d56d474.gif)
+
+
 ### Flags
 
 - `-o`, `--output` predefines the save-destination
@@ -25,6 +30,14 @@ First you select your screenshot through maim like you are used to. The result g
 - `--ontop` puts the window above all others on startup
 - `--maximize` maximizes the window on startup
 - `-h`, `--help`, `-v`, `--version` wip
+
+### Configuration
+
+Pinsel provides a lua configuration. You can create your own config by placing a `init.lua` file in `$XDG_CONFIG_HOME/pinsel/init.lua` or `$HOME/.config/pinsel/init.lua`. For reference: The default config can be found in `data/init.lua`. Since the lua configuration handles a lot of things (most notably keybindings and mousebindings), it might be a good idea to start out by modifying the default config.
+
+The lua configuration is very flexible. With the right configuration, I can for example play pong in pinsel:
+
+![](https://user-images.githubusercontent.com/70270606/132034355-63b656d1-75ff-49dc-ba12-bf8b333c5ef6.gif)
 
 
 ### Shortcuts
@@ -38,15 +51,12 @@ git clone https://github.com/Nooo37/pinsel.git
 cd pinsel
 sudo make install # will put the binary in /usr/local/bin
 ```
-## Video
-
-![](https://cdn.discordapp.com/attachments/833686255446917123/874025047524798525/output.gif)
 
 ## TODO
 - [x] allow for all font faces
 - [ ] add `--help` text, man page
 - [ ] allow for other formats than png
-- [ ] make text actually draggable when the dialog is open
+- [x] make text actually draggable when the dialog is open
 - [ ] add a titlebar to the text dialog
 - [ ] release
 
