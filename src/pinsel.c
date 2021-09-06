@@ -21,7 +21,7 @@ struct arguments {
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state);
 
-const char *argp_program_version = "pinsel 0.9";
+const char *argp_program_version = "pinsel 0.0.0";
 const char *argp_program_bug_address = "https://github.com/Nooo37/pinsel/issues/new";
 static char doc[] = "Minimal screenshot annotation tool with lua config";
 static char args_doc[] = "FILE";
