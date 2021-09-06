@@ -3,6 +3,7 @@
 #include <gio/gunixinputstream.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <argp.h>
 
 #include "pinsel.h"
 #include "config.h"
@@ -10,11 +11,45 @@
 #include "utils.h"
 #include "gui.h"
 
+struct arguments {
+    gboolean is_on_top;
+    gboolean is_maximized;
+    const char *output_format;
+    const char *init_dest;
+    const char *pixbuf_file;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state);
+
+const char *argp_program_version = "pinsel 0.9";
+const char *argp_program_bug_address = "https://github.com/Nooo37/pinsel/issues/new";
+static char doc[] = "Minimal screenshot annotation tool with lua config";
+static char args_doc[] = "FILE";
+
+static struct argp_option options[] = {
+//    long name     short   arg flags doc
+    { "output",     'o',    "FILE", 0,   "Save result to FILE"              },
+    { "format",     'f',    0,      0,   "Define the image format"          },
+    { "ontop",      't',    0,      0,   "Puts the window above all others" },
+    { "maximize",   'm',    0,      0,   "Maximizes the window on startup"  },
+    { 0 }
+};
+
+static struct argp argp = { options, parse_opt, args_doc, doc };
+
 int main(int argc, char *argv[])
 {
-    gboolean is_on_top = FALSE, is_maximized = FALSE;
-    char *output_format = "png";
-    gchar *init_dest = NULL;
+    struct arguments args = {
+        .is_on_top = FALSE,
+        .is_maximized = FALSE,
+        .output_format = NULL,
+        .init_dest = NULL,
+        .pixbuf_file = NULL
+    };
+
+    // handle command line arguments
+    argp_parse(&argp, argc, argv, 0, 0, &args);
+
     GdkPixbuf *init_pix = NULL;
 
     // read image from stdin if something is being piped into the app
@@ -27,6 +62,21 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Failed to load image from stdin\n%s\n", err->message);
             return 1;
         }
+    // read image from file parameter
+    } else if (args.pixbuf_file != NULL) {
+        GError *err = NULL;
+        init_pix = gdk_pixbuf_new_from_file(args.pixbuf_file, &err);
+        if (args.init_dest == NULL)
+            args.init_dest = args.pixbuf_file;
+        if (err) {
+            fprintf(stderr, "Failed to load image from argument\n%s\n",
+                    err->message);
+            return 1;
+        }
+    } else {
+        argp_help(&argp, stdout,
+                  ARGP_HELP_USAGE | ARGP_HELP_DOC | ARGP_HELP_LONG,
+                  "pinsel");
     }
 
     char* config_file_location = "init.lua";
@@ -43,59 +93,10 @@ int main(int argc, char *argv[])
         use_default_config = TRUE;
 
     /* printf("%s", config_file_location); */
-        
+
     if (!config_init(config_file_location, use_default_config)) {
         fprintf(stderr, "Failed to initalize configuration\n");
         return 1;
-    }
-
-
-    // handle all the other command line arguments
-    for (int i = 1; i < argc; i++) {
-        if (FALSE) {
-            //
-        } MATCH(argv[i], "--output", "-o") {
-            i++;
-            if (i >= argc) {
-                fprintf(stderr, "Missing argument for '%s'\n", argv[i - 1]);
-                return 1;
-            } else {
-                init_dest = argv[i];
-            }
-        } MATCH(argv[i], "--format", "-f") {
-            i++;
-            if (i >= argc) {
-                fprintf(stderr, "Missing argument for '%s'\n", argv[i - 1]);
-                return 1;
-            } else {
-                if (strcmp(argv[i], "jpg") == 0)
-                    argv[i] = "jpeg";
-                if (!is_valid_output_format(argv[i])) {
-                    fprintf(stderr, "Not a valid output format: '%s'\n", argv[i]);
-                    return 1;
-                }
-                output_format = argv[i];
-            }
-        } MATCH(argv[i], "--help", "-h") {
-            print_help();
-            return 0;
-        } MATCH(argv[i], "--version", "-v") {
-            printf("%s\n", VERSION);
-            return 0;
-        } MATCH(argv[i], "--ontop") {
-            is_on_top = TRUE;
-        } MATCH(argv[i], "--maximize") {
-            is_maximized = TRUE;
-        } else if (!GDK_IS_PIXBUF(init_pix)) { 
-            GError *err = NULL;
-            init_pix = gdk_pixbuf_new_from_file(argv[i], &err);
-            if (init_dest == NULL)
-                init_dest = argv[i];
-            if (err) {
-                fprintf(stderr, "Failed to load image from argument\n%s\n", err->message);
-                return 1;
-            }
-        }
     }
 
     if (!GDK_IS_PIXBUF(init_pix)) {
@@ -105,11 +106,11 @@ int main(int argc, char *argv[])
 
     int limit = config_get_history_limit();
     pix_init(init_pix, limit);
-    pix_set_dest(init_dest);
+    pix_set_dest(args.init_dest);
 
     gtk_init(&argc, &argv);
 
-    if (!gui_init(is_on_top, is_maximized))
+    if (!gui_init(args.is_on_top, args.is_maximized))
         return 1;
 
     gtk_main();
@@ -119,7 +120,8 @@ int main(int argc, char *argv[])
         GError *err = NULL;
         GOutputStream *stdout_stream = g_unix_output_stream_new(1, FALSE);
 
-        gdk_pixbuf_save_to_stream(pix_get_current(), stdout_stream, output_format, NULL, &err, NULL);
+        gdk_pixbuf_save_to_stream(pix_get_current(), stdout_stream,
+                                  args.output_format, NULL, &err, NULL);
         if (err != NULL) {
             printf("%s\n", err->message);
             return 1;
@@ -133,4 +135,36 @@ int main(int argc, char *argv[])
     }
 
     return 0;
+}
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state)
+{
+        struct arguments *arguments = state->input;
+
+        switch (key) {
+                case 'o': /* output */
+                        arguments->init_dest = arg;
+                        break;
+                case 'f': /* format */
+                        arguments->output_format = arg;
+                        break;
+                case 't': /* on top */
+                        arguments->is_on_top = TRUE;
+                        break;
+                case 'm': /* maximize */
+                        arguments->is_maximized = TRUE;
+                        break;
+                case ARGP_KEY_ARG:
+                        if (state->arg_num > 1) {
+                                argp_usage(state);
+                        }
+
+                        arguments->pixbuf_file = arg;
+                        break;
+
+                default:
+                        return ARGP_ERR_UNKNOWN;
+        }
+
+        return 0;
 }
