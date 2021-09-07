@@ -376,7 +376,12 @@ extern int config_init(char* config_file, gboolean use_default_config)
     char buffer[buffer_size];
     gsize count;
     g_input_stream_read_all(pinsel_stream, buffer, buffer_size, &count, NULL,  NULL);
-    luaL_dostring(L, buffer);
+
+    int status_lib_lua = luaL_dostring(L, buffer);
+    if (status_lib_lua) {
+        fprintf(stderr, "Couldn't load pinsel lua lib: %s\n", lua_tostring(L, -1));
+        return 0;
+    }
 
     if (use_default_config) {
         GInputStream* pinsel_stream = g_resources_open_stream("/data/init.lua", 
@@ -385,11 +390,15 @@ extern int config_init(char* config_file, gboolean use_default_config)
         char config_buffer[buffer_size];
         gsize count;
         g_input_stream_read_all(pinsel_stream, config_buffer, buffer_size, &count, NULL,  NULL);
-        luaL_dostring(L, config_buffer);
+        int status_init_lua = luaL_dostring(L, config_buffer);
+        if (status_init_lua) {
+            fprintf(stderr, "Couldn't load default init: %s\n", lua_tostring(L, -1));
+            return 0;
+        }
     } else {
-        int status = luaL_dofile(L, config_file);
-        if (status) {
-            fprintf(stderr, "Couldn't load file: %s\n", lua_tostring(L, -1));
+        int status_init_lua = luaL_dofile(L, config_file);
+        if (status_init_lua) {
+            fprintf(stderr, "Couldn't load config file (%s): %s\n", config_file, lua_tostring(L, -1));
             return 0;
         }
     }
