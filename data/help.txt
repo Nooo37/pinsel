@@ -1,3 +1,0 @@
-PINSEL
-
-This help text needs some work. PR a better text by editing data/help.txt

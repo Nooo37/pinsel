@@ -18,6 +18,4 @@ extern float get_sane_scale(int img_width, int img_height, int area_width, int a
 
 extern gboolean is_valid_output_format(char *format);
 
-extern void print_help();
-
 #endif

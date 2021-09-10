@@ -29,12 +29,3 @@ extern gboolean is_valid_output_format(const char *format)
     return FALSE;
 }
 
-extern void print_help()
-{
-    GInputStream* help_stream = g_resources_open_stream("/data/help.txt", G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
-    int buffer_size = 10000;
-    char buffer[buffer_size];
-    gsize count;
-    g_input_stream_read_all (help_stream, buffer, buffer_size, &count, NULL,  NULL);
-    printf("%s", buffer);
-}

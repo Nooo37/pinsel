@@ -44,12 +44,12 @@ extern void update_drawing_area()
     cairo_t* cr = gdk_drawing_context_get_cairo_context(drawing_context);
 
     // "clear" background
-    /* if (getenv("WAYLAND_DISPLAY")) { */
+    if (getenv("WAYLAND_DISPLAY")) {
         gtk_widget_queue_draw(canvas);
-    /* } else { */
-        /* cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE); */
-        /* cairo_paint(cr); */
-    /* } */
+    } else {
+        cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+        cairo_paint(cr);
+    }
 
     // draw
     cairo_translate(cr, geo->mid_x + geo->offset_x, geo->mid_y + geo->offset_y);

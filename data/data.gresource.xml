@@ -4,6 +4,5 @@
     <file preprocess="xml-stripblanks">data/window.ui</file>
     <file>data/pinsel.lua</file>
     <file>data/init.lua</file>
-    <file>data/help.txt</file>
   </gresource>
 </gresources>
