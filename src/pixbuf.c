@@ -159,6 +159,14 @@ extern void pix_perform_action(Action *action)
                 g_object_unref(temp);
                 return;
             } break;
+        case CROP_ACTION: {
+                GdkPixbuf *temp = gdk_pixbuf_copy(displayed);
+                g_object_unref(displayed);
+                displayed = perform_action_crop(action->crop, temp);
+                g_object_unref(temp);
+                update_geo();
+                return;
+            } break;
         case FLIP_HORIZONTALLY: {
                 GdkPixbuf *temp;
                 temp = gdk_pixbuf_copy(draw_layer);

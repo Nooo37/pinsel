@@ -205,3 +205,12 @@ extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
 
     return result;
 }
+
+extern GdkPixbuf* draw_crop(GdkPixbuf *original, 
+                            int x,
+                            int y,
+                            int width,
+                            int height)
+{
+    return gdk_pixbuf_new_subpixbuf(original, x, y, width, height);
+}

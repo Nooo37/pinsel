@@ -296,6 +296,20 @@ static int config_erase(lua_State *L)
     return 1;
 }
 
+static int config_crop(lua_State *L)
+{
+    CropAction da;
+    da.x = luaL_checknumber(L, 1);
+    da.y = luaL_checknumber(L, 2);
+    da.width = luaL_checknumber(L, 3);
+    da.height = luaL_checknumber(L, 4);
+    Action action;
+    action.type = CROP_ACTION;
+    action.crop = &da;
+    config_perform_action(&action);
+    return 1;
+}
+
 static gboolean config_notify_tick(gpointer data)
 {
     lua_settop(L, 0);
@@ -336,6 +350,7 @@ extern int config_init(char* config_file, gboolean use_default_config)
         { "apply",      config_apply },
         { "path_clear", config_path_clear },
         { "path_add",   config_path_add },
+        { "crop",       config_crop },
         { "draw",       config_draw },
         { "text",       config_text },
         { "erase",      config_erase },

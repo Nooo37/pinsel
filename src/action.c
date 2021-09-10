@@ -18,3 +18,8 @@ extern GdkPixbuf* perform_action_erase(EraseAction *action, GdkPixbuf *base)
     return erase_under_line(base, action->positions, action->width, action->alpha);
 }
 
+extern GdkPixbuf* perform_action_crop(CropAction *action, GdkPixbuf *base)
+{
+    return draw_crop(base, action->x, action->y, action->width, action->height);
+}
+

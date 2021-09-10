@@ -83,4 +83,18 @@ extern GdkPixbuf* erase_under_line(GdkPixbuf *original,
                                    int width,
                                    float alpha);
 
+/*
+ * Crops the given image to the given width and height starting at the 
+ * given coordinates
+ *
+ * original: THe pixbuf that should be cropped
+ * x: y: The coordinates of the upper left crop-rectangle
+ * width: height: The width and the height of the crop-rectangle
+ */
+extern GdkPixbuf* draw_crop(GdkPixbuf *original, 
+                            int x,
+                            int y,
+                            int width,
+                            int height);
+
 #endif

@@ -30,6 +30,13 @@ typedef struct {
 } TextAction;
 
 typedef struct {
+    int x;
+    int y;
+    int width;
+    int height;
+} CropAction;
+
+typedef struct {
     float scale;
     int mid_x;
     int mid_y;
@@ -48,6 +55,7 @@ typedef enum {
     BRUSH_ACTION,
     ERASE_ACTION,
     TEXT_ACTION,
+    CROP_ACTION,
     FLIP_HORIZONTALLY,
     FLIP_VERTICALLY,
     ROTATE_CLOCKWISE,
@@ -73,7 +81,6 @@ typedef enum {
     MOVE_HORIZONTALLY,
     MOVE_VERTICALLY,
     FIT_POSITION,
-
 } ActionType;
 
 typedef struct {
@@ -82,6 +89,7 @@ typedef struct {
         BrushAction *brush; /* BRUSH_ACTION */
         EraseAction *erase; /* ERASE_ACTION */
         TextAction *text; /* TEXT_ACTION */
+        CropAction *crop; /* CROP_ACTION */
         Mode mode; /* SET_MODE */
         float zoom; /* ZOOM */
         int move; /* MOVE_HORIZONTALLY, MOVE_VERTICALLY */
@@ -95,4 +103,7 @@ extern GdkPixbuf* perform_action_brush(BrushAction *action, GdkPixbuf *base);
 extern GdkPixbuf* perform_action_text(TextAction *action, GdkPixbuf *base);
 
 extern GdkPixbuf* perform_action_erase(EraseAction *action, GdkPixbuf *base);
+
+extern GdkPixbuf* perform_action_crop(CropAction *action, GdkPixbuf *base);
+
 #endif
