@@ -372,7 +372,7 @@ extern int config_init(char* config_file, gboolean use_default_config)
 
     GInputStream* pinsel_stream = g_resources_open_stream("/data/pinsel.lua", 
                     G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
-    int buffer_size = 10000; // TODO: change
+    int buffer_size = 100000; // TODO: change
     char buffer[buffer_size];
     gsize count;
     g_input_stream_read_all(pinsel_stream, buffer, buffer_size, &count, NULL,  NULL);
@@ -386,7 +386,6 @@ extern int config_init(char* config_file, gboolean use_default_config)
     if (use_default_config) {
         GInputStream* pinsel_stream = g_resources_open_stream("/data/init.lua", 
                         G_RESOURCE_LOOKUP_FLAGS_NONE, NULL);
-        int buffer_size = 100000; // TODO: change
         char config_buffer[buffer_size];
         gsize count;
         g_input_stream_read_all(pinsel_stream, config_buffer, buffer_size, &count, NULL,  NULL);
