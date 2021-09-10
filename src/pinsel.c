@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     struct arguments args = {
         .is_on_top = FALSE,
         .is_maximized = FALSE,
-        .output_format = NULL,
+        .output_format = "png",
         .init_dest = NULL,
         .pixbuf_file = NULL
     };
@@ -92,8 +92,6 @@ int main(int argc, char *argv[])
     if (access(config_file_location, R_OK) != 0)
         use_default_config = TRUE;
 
-    /* printf("%s", config_file_location); */
-
     if (!config_init(config_file_location, use_default_config)) {
         fprintf(stderr, "Failed to initalize configuration\n");
         return 1;
@@ -123,13 +121,13 @@ int main(int argc, char *argv[])
         gdk_pixbuf_save_to_stream(pix_get_current(), stdout_stream,
                                   args.output_format, NULL, &err, NULL);
         if (err != NULL) {
-            printf("%s\n", err->message);
+            fprintf(stderr, "%s\n", err->message);
             return 1;
         }
 
         g_output_stream_flush(stdout_stream, NULL, &err);
         if (err != NULL) {
-            printf("%s\n", err->message);
+            fprintf(stderr, "%s\n", err->message);
             return 1;
         }
     }
