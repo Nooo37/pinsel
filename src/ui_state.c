@@ -95,15 +95,6 @@ extern void ui_perform_action(Action* action)
         case UPDATE: {
             gui_update();
         } break;
-        case ZOOM: {
-            geo.scale += action->zoom;
-        } break;
-        case MOVE_HORIZONTALLY: {
-            geo.offset_x += action->move;
-        } break;
-        case MOVE_VERTICALLY: {
-            geo.offset_y += action->move;
-        } break;
         case FIT_POSITION: {
             geo.offset_x = 0;
             geo.offset_y = 0;

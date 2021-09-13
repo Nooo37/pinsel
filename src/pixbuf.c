@@ -70,7 +70,7 @@ extern GdkPixbuf* pix_get_current()
 
 extern GdkPixbuf* pix_get_displayed()
 {
-    return gdk_pixbuf_copy(displayed);
+    return displayed;
 }
 
 extern void pix_undo_temrporarily_action()
@@ -133,6 +133,7 @@ extern void pix_perform_action(Action *action)
     switch (action->type) {
         case APPLY: {
                 copy_displayed_to_pix();
+                update_geo();
             } break;
         case DISCARD: {
                 copy_pix_to_displayed();
@@ -160,11 +161,40 @@ extern void pix_perform_action(Action *action)
                 return;
             } break;
         case CROP_ACTION: {
+                CropAction *old = action->crop;
+                CropAction crop;
+                // sanitize the incomming crop geometry a bit
+                // (shouldn't error out with negative/out-of-bounds sizes)
+                crop.x = old->x;
+                crop.y = old->y;
+                crop.width = old->width;
+                crop.height = old->height;
+                if (crop.width < 0) {
+                    crop.x += crop.width;
+                    crop.width *= -1;
+                }
+                if (crop.height < 0) {
+                    crop.y += crop.height;
+                    crop.height *= -1;
+                }
+                if (crop.x < 0) {
+                    crop.width += crop.x;
+                    crop.x = 0;
+                }
+                if (crop.y < 0) {
+                    crop.height += crop.y;
+                    crop.y = 0;
+                }
+                if (crop.width + crop.x > width) {
+                    crop.width = width - crop.x;
+                }
+                if (crop.height + crop.y > height) {
+                    crop.height = height - crop.y;
+                }
                 GdkPixbuf *temp = gdk_pixbuf_copy(displayed);
                 g_object_unref(displayed);
-                displayed = perform_action_crop(action->crop, temp);
+                displayed = perform_action_crop(&crop, temp);
                 g_object_unref(temp);
-                update_geo();
                 return;
             } break;
         case FLIP_HORIZONTALLY: {

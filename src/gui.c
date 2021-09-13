@@ -5,6 +5,7 @@
 #include <gtk/gtk.h>
 #include <pango/pangocairo.h>
 
+#include "cairo.h"
 #include "gui.h"
 #include "config.h"
 #include "ui_state.h"
@@ -26,9 +27,8 @@ static GtkColorChooser *color_picker_secondary;
 static GtkAdjustment *radius_scale;
 
 // updates the drawing area based on global state
-extern void update_drawing_area() 
+static void update_drawing_area() 
 {
-    // update geometry
     UIGeometry *geo = ui_get_geo();
     geo->area_height = gtk_widget_get_allocated_height(canvas);
     geo->area_width = gtk_widget_get_allocated_width(canvas);
@@ -43,11 +43,12 @@ extern void update_drawing_area()
     GdkDrawingContext* drawing_context = gdk_window_begin_draw_frame(window,cairo_region);
     cairo_t* cr = gdk_drawing_context_get_cairo_context(drawing_context);
 
-    // "clear" background
+    // make background black -> overpaint the last area
     if (getenv("WAYLAND_DISPLAY")) {
         gtk_widget_queue_draw(canvas);
     } else {
-        cairo_set_operator(cr, CAIRO_OPERATOR_SOURCE);
+        cairo_set_source_rgb(cr, 0, 0, 0);
+        cairo_fill(cr);
         cairo_paint(cr);
     }
 
@@ -61,7 +62,6 @@ extern void update_drawing_area()
     // cleanup
     gdk_window_end_draw_frame(window, drawing_context);
     cairo_region_destroy(cairo_region);
-    g_object_unref(temp);
 
     gtk_widget_set_sensitive(GTK_WIDGET(undo_button), pix_has_undo());
     gtk_widget_set_sensitive(GTK_WIDGET(redo_button), pix_has_redo());
@@ -76,6 +76,7 @@ static void set_title_saved(gboolean is_saved)
     else {
         char *temp = g_strdup_printf("*%s", basename(pix_get_dest()));
         gtk_window_set_title((GtkWindow*) window, temp);
+        g_free(temp);
     }
 }
 
@@ -347,19 +348,6 @@ static void quit_text_tool_cancel()
     set_title_saved(pix_is_saved());
 }
 
-
-static int translate_x(int x)
-{
-    UIGeometry *geo = ui_get_geo();
-    return (x - geo->offset_x - geo->mid_x) / geo->scale;
-}
-
-static int translate_y(int y)
-{
-    UIGeometry *geo = ui_get_geo();
-    return (y - geo->offset_y - geo->mid_y) / geo->scale;
-}
-
 extern void gui_update()
 {
     update_drawing_area();
@@ -393,15 +381,13 @@ static void change_radius(GtkAdjustment *adjust)
 static gboolean on_click(GtkWidget      *widget,
                          GdkEventButton *event)
 {
-    int x, y, x_translated, y_translated;
+    int x, y;
 
     x = event->x;
     y = event->y;
-    x_translated = translate_x(x);
-    y_translated = translate_y(y);
 
     Modifiers mod = convert_gdk_to_modifiers(event->state);
-    config_perform_click_event(event->button, x_translated, y_translated, mod);
+    config_perform_click_event(event->button, x, y, mod);
     gui_update();
     return TRUE;
 }
@@ -409,7 +395,7 @@ static gboolean on_click(GtkWidget      *widget,
 static gboolean on_motion(GtkWidget *widget,
                           GdkEventMotion *event)
 {
-    int x, y, x_translated, y_translated;
+    int x, y;
     GdkModifierType state;
 
     // get coords
@@ -421,13 +407,10 @@ static gboolean on_motion(GtkWidget *widget,
         state = event->state;
     }
 
-    x_translated = translate_x(x);
-    y_translated = translate_y(y);
-
     Modifiers mod = convert_gdk_to_modifiers(state);
-    config_perform_motion_event(x_translated, y_translated, mod);
+    config_perform_motion_event(x, y, mod);
 
-    gui_update();
+    update_drawing_area();
     return TRUE;
 }
 
@@ -470,6 +453,7 @@ extern int gui_init(gboolean is_on_top,
     GtkTextBuffer *textbuffer;
     GtkFontButton *font_button;
     GtkWidget *popover, *about_dialog, *shortcuts_dialog;
+    gtk_application_new ("org.gtk.example", G_APPLICATION_FLAGS_NONE);
 
     // init devices (for mouse position and clipboard)
     display = gdk_display_get_default();

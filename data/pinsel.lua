@@ -99,6 +99,13 @@ Control_ = Key.new(nil, { control = true })
 
 local keys = {}
 
+pinsel.translate = function(x_raw, y_raw)
+    local geo = pinsel.get_geo()
+    local x = (x_raw - geo.offset_x - geo.mid_x) / geo.scale
+    local y = (y_raw - geo.offset_y - geo.mid_y) / geo.scale
+    return x, y
+end
+
 pinsel.move = function(delta_x, delta_y)
     local geo = pinsel.get_geo()
     pinsel.set_geo({

@@ -54,7 +54,7 @@ sudo make install # will put the binary in /usr/local/bin
 
 ## TODO
 - [x] allow for all font faces
-- [ ] add `--help` text, man page
+- [x] add `--help` text
 - [ ] allow for other formats than png
 - [x] make text actually draggable when the dialog is open
 - [ ] add a titlebar to the text dialog

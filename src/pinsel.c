@@ -27,11 +27,11 @@ static char doc[] = "Minimal screenshot annotation tool with lua config";
 static char args_doc[] = "FILE";
 
 static struct argp_option options[] = {
-//    long name     short   arg flags doc
-    { "output",     'o',    "FILE", 0,   "Save result to FILE"              },
-    { "format",     'f',    0,      0,   "Define the image format"          },
-    { "ontop",      't',    0,      0,   "Puts the window above all others" },
-    { "maximize",   'm',    0,      0,   "Maximizes the window on startup"  },
+//    long name     short   arg       flags doc
+    { "output",     'o',    "FILE",   0,   "Save result to FILE"              },
+    { "format",     'f',    "FORMAT", 0,   "Define the image format"          },
+    { "ontop",      't',    0,        0,   "Puts the window above all others" },
+    { "maximize",   'm',    0,        0,   "Maximizes the window on startup"  },
     { 0 }
 };
 

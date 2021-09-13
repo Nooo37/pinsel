@@ -76,10 +76,6 @@ typedef enum {
     QUIT_UNSAFE,
 
     SET_GEO,
-    //
-    ZOOM,
-    MOVE_HORIZONTALLY,
-    MOVE_VERTICALLY,
     FIT_POSITION,
 } ActionType;
 
@@ -91,8 +87,6 @@ typedef struct {
         TextAction *text; /* TEXT_ACTION */
         CropAction *crop; /* CROP_ACTION */
         Mode mode; /* SET_MODE */
-        float zoom; /* ZOOM */
-        int move; /* MOVE_HORIZONTALLY, MOVE_VERTICALLY */
         GdkRGBA color; /* SET_COLOR1, SET_COLOR2 */
         UIGeometry geo; /* SET_GEO */
     };

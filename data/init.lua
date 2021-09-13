@@ -8,7 +8,7 @@ local BRUSH_MODE, ERASER_MODE, TEXT_MODE = BRUSH_MODE, ERASER_MODE, TEXT_MODE
 local DELTA = 10
 local ZOOM = 0.1
 local x_start, y_start
-local x_line, y_line
+local old_offset_x, old_offset_y
 local x_text = 0
 local y_text = 0
 local text = ""
@@ -19,14 +19,17 @@ local activity = "idle"
 
 local function is_brush(mod)
     local mode = pinsel.get_mode()
-    return (mode == BRUSH_MODE and mod.button1 and not mod.shift) or
-           (mode == ERASER_MODE and mod.button3)
+    return (mode == BRUSH_MODE and mod.button1 and not mod.shift)
 end
 
 local function is_erase(mod)
     local mode = pinsel.get_mode()
-    return (mode == BRUSH_MODE and mod.button3) or
-           (mode == ERASER_MODE and mod.button1)
+    return (mode == BRUSH_MODE and mod.button3)
+end
+
+local function is_crop(mod)
+    local mode = pinsel.get_mode()
+    return (mode == ERASER_MODE and mod.button1)
 end
 
 local function is_line(mod)
@@ -56,7 +59,7 @@ keys = {
     { Y_,   function() pinsel.flip(false) end,   "Manipulation", "flip horizontally" },
     { O_,   function() pinsel.flip(true) end,    "Manipulation", "flip vertically" },
     { A_,   function() pinsel.set_color1(math.random(), math.random(), math.random(), 1) end, "GUI", "random color" },
-    { ScrollUp_, function() pinsel.zoom( ZOOM) end, "Navigation", "zoom in" },
+    { ScrollUp_, function() pinsel.zoom(ZOOM) end, "Navigation", "zoom in" },
     { ScrollDown_, function() pinsel.zoom(-ZOOM) end, "Navigation", "zoom out" },
     { Control_ + T_, function() temp_keys = keys; keys = mode_keys end, "GUI", "modal binding for modes (b, e or t should follow)" },
     { Alt_ + X_, pinsel.undo_all, "History", "undo all changes" },
@@ -76,10 +79,11 @@ pinsel.on_key = function(key, mod)
     end
 end
 
-pinsel.on_click = function(b, x, y, mod)
+pinsel.on_click = function(b, x_raw, y_raw, mod)
+    local x, y = pinsel.translate(x_raw, y_raw)
     mod.button1 = (b == 1)
     if pinsel.get_mode() == BRUSH_MODE and is_brush(mod) then
-        pinsel.on_motion(x, y, mod)
+        pinsel.on_motion(x_raw, y_raw, mod)
     elseif pinsel.get_mode() == TEXT_MODE then
         x_text = x
         y_text = y
@@ -93,9 +97,12 @@ pinsel.on_click = function(b, x, y, mod)
     end
 end
 
-pinsel.on_motion = function(x, y, mod)
+pinsel.on_motion = function(x_raw, y_raw, mod)
+    local x, y = pinsel.translate(x_raw, y_raw)
     if is_brush(mod) then activity = "brush" end
     if is_erase(mod) then activity = "erase" end
+    local is_drag_bool = is_drag(mod)
+    local is_line_bool = is_line(mod)
 
     if activity == "brush" then
         pinsel.discard()
@@ -106,6 +113,7 @@ pinsel.on_motion = function(x, y, mod)
             pinsel.path_clear()
             activity = "idle"
         end
+        return
     end
 
     if activity == "erase" then
@@ -117,36 +125,65 @@ pinsel.on_motion = function(x, y, mod)
             pinsel.path_clear()
             activity = "idle"
         end
+        return
     end
 
-    if is_line(mod) or activity == "line" then
-        if is_line(mod) and activity ~= "line" then
-            x_line = x
-            y_line = y
+    if is_line_bool or activity == "line" then
+        if is_line_bool and activity ~= "line" then
+            x_start = x
+            y_start = y
             activity = "line"
         end
         pinsel.discard()
         pinsel.path_clear()
-        pinsel.path_add(x_line, y_line)
+        pinsel.path_add(x_start, y_start)
         pinsel.path_add(x, y)
         pinsel.draw()
-        if not is_line(mod) then
+        if not is_line_bool then
             pinsel.apply()
             pinsel.path_clear()
             activity = "idle"
         end
+        return
     end
 
-    if is_drag(mod) or activity == "drag" then
-        if is_drag(mod) and activity == "drag" then
-            pinsel.move(x - x_start, y - y_start)
-        elseif is_drag(mod) then
+    if is_crop(mod) or activity == "crop" then
+        if is_crop(mod) and activity ~= "crop" then
             x_start = x
             y_start = y
+            activity = "crop"
+        end
+        pinsel.discard()
+        pinsel.path_clear()
+        pinsel.path_add(x_start, y_start)
+        pinsel.path_add(x_start, y)
+        pinsel.path_add(x, y)
+        pinsel.path_add(x, y_start)
+        pinsel.path_add(x_start, y_start)
+        pinsel.draw()
+        if not is_crop(mod) then
+            pinsel.discard()
+            pinsel.path_clear()
+            pinsel.crop(x_start, y_start, x - x_start, y - y_start)
+            pinsel.apply()
+            activity = "idle"
+        end
+        return
+    end
+
+    if is_drag_bool or activity == "drag" then
+        if is_drag_bool and activity == "drag" then
+            pinsel.move(x_raw - x_start, y_raw - y_start)
+            x_start = x_raw
+            y_start = y_raw
+        elseif is_drag_bool then
+            x_start = x_raw
+            y_start = y_raw
             activity = "drag"
         else
             activity = "idle"
         end
+        return
     end
 
     if pinsel.get_mode() == TEXT_MODE and mod.button1 then
@@ -156,6 +193,7 @@ pinsel.on_motion = function(x, y, mod)
             pinsel.discard()
             pinsel.text(text, x_text, y_text)
         end
+        return
     end
 end
 

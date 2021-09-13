@@ -16,7 +16,6 @@ static GList *coords = NULL;
 extern void config_perform_action(Action *action)
 {
     switch (action->type) {
-        case ZOOM: case MOVE_HORIZONTALLY: case MOVE_VERTICALLY:
         case FIT_POSITION: case QUIT_UNSAFE: case SAVE_AS: case OPEN:
         case SWITCH_MODE: case SWITCH_COLORS: case SET_COLOR1: case SET_COLOR2:
         case TEXT_INPUT: case SET_GEO: case UPDATE:
@@ -84,12 +83,12 @@ static int config_set_geo(lua_State *L)
     lua_pushstring(L, "offset_x");
     lua_gettable(L, -2);
     if (lua_isnumber(L, -1))
-        geo->offset_x = (int) luaL_checknumber(L, -1);
+        geo->offset_x = luaL_checknumber(L, -1);
     lua_pop(L, 1);
     lua_pushstring(L, "offset_y");
     lua_gettable(L, -2);
     if (lua_isnumber(L, -1))
-        geo->offset_y = (int) luaL_checknumber(L, -1);
+        geo->offset_y = luaL_checknumber(L, -1);
     lua_pop(L, 1);
     return 1;
 }

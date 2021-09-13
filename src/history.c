@@ -43,7 +43,7 @@ extern void history_add_one(GdkPixbuf *layer)
 {
     g_queue_clear_full(redo_history, g_object_unref);
     history_add_one_to_undo(current);
-    /* g_object_unref(current); */
+    g_object_unref(current);
     current = gdk_pixbuf_copy(layer);
 }
 
